@@ -42,13 +42,14 @@ def build_logistic_regression(C=2.0):
     return vectorizer, clf
 
 
-def build_svm():
+def build_svm(C=1.0, kernel="rbf", gamma="scale"):
     """Paper (Sec 4.2) uses scikit-learn's SVM with no hyperparameter search
-    mentioned -> default SVC (kernel='rbf', C=1.0, gamma='scale')."""
+    mentioned -> default SVC (kernel='rbf', C=1.0, gamma='scale'). Phase-2
+    tuning sweeps C/kernel/gamma on dev."""
     vectorizer = CountVectorizer(
         tokenizer=identity_tokenizer, preprocessor=lambda x: x, lowercase=False
     )
-    clf = SVC(kernel="rbf", C=1.0, gamma="scale")
+    clf = SVC(kernel=kernel, C=C, gamma=gamma)
     return vectorizer, clf
 
 

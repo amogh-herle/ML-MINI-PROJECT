@@ -27,3 +27,12 @@
 |---|---|---|---|---|
 | logistic_regression_unigram | 0.6553 | 0.6321 | 0.7922 | 0.7031 |
 | svm_unigram | 0.6647 | 0.6435 | 0.7831 | 0.7065 |
+
+### Phase 2 — Before/after tuning (dev-only selection, test touched once)
+| Classifier | Tokenization | Best Params | Dev F1 Before | Dev F1 After | Test F1 After |
+|---|---|---|---|---|---|
+| naive_bayes | trigram | alpha=0.1 | 0.6534 | 0.6566 | 0.6522 |
+| bigram_model | unigram | alpha=1.0 | 0.6463 | 0.6463 | 0.6426 |
+| svm | unigram | C=1.0, kernel=rbf | 0.6951 | 0.6951 | 0.7065 |
+| logistic_regression | unigram | C=0.1 | 0.7101 | 0.7101 | 0.7031 |
+| lstm | unigram | embedding_dim=128, lstm_units=64, dropout=0.3 | 0.6589 | 0.6569 | 0.6552 |

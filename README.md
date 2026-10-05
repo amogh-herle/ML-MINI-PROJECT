@@ -62,9 +62,12 @@ Table 1 analog ([`results/table1.json`](results/table1.json),
 paper's selection of "LSTM bigram" + "SVM text2vec" for its Table 2), evaluate
 them once on the held-out test set → [`results/table2.json`](results/table2.json).
 
-**Phase 3 (tune):** on top of the paper's own settings, we additionally grid
-search Naive Bayes `alpha` and the interpolation `lambda`, and sweep SVM/LR
-regularization more broadly than the paper did, all against dev only.
+**Phase 2 (tune):** [`tune_all.py`](tune_all.py) takes each classifier's best
+tokenization from Phase 1 and tunes its hyperparameters on the dev set only
+(Naive Bayes `alpha`, Bigram-LM smoothing `alpha`, SVM `C`/`kernel`,
+Logistic Regression `C` over a wider grid, LSTM `embedding_dim`/`lstm_units`/
+`dropout`), then touches the test set exactly once with the winning config
+per model → [`results/tuned_results.json`](results/tuned_results.json).
 
 ## Results
 
@@ -73,16 +76,30 @@ Full grid in [`results/table1.json`](results/table1.json) /
 [`results/figures/dev_f1_by_classifier.png`](results/figures/dev_f1_by_classifier.png).
 Test-set numbers for the best 2 models in [`results/table2.json`](results/table2.json).
 
+Phase 2 (tuned) results in [`results/tuned_results.json`](results/tuned_results.json),
+also summarized in `comparison_table.md`, with a before/after chart at
+[`results/figures/before_after_tuning.png`](results/figures/before_after_tuning.png).
+
+Summary: Naive Bayes gained the most from tuning (dev F1 0.653 → 0.657,
+`alpha` dropping from 1.0 to 0.1 — less smoothing fit this data better).
+SVM, Logistic Regression and LSTM were already close to their dev-optimal
+settings in Phase 1 (paper's defaults / the per-tokenization C search already
+built into the paper's own methodology), so Phase 2 found little further
+room — their test F1 moves are within noise of the Phase 1 numbers, which
+is itself a useful finding: the paper's untuned baselines were not far from
+optimal for this dataset.
+
 ## Setup & running
 
 ```bash
 pip install -r requirements.txt
-python run_all.py                    # full replication + selection, writes results/table1.json, table2.json
-python src/make_report_assets.py     # builds comparison_table.md + bar chart from the results
+python run_all.py                    # Phase 1: full replication + selection -> results/table1.json, table2.json
+python tune_all.py                   # Phase 2: dev-only hyperparameter tuning -> results/tuned_results.json
+python src/make_report_assets.py     # builds comparison_table.md + charts from the results
 ```
 
-Runtime: ~2 minutes on CPU (dataset parquet is checked into `data/`, no
-re-download needed).
+Runtime: ~2 minutes per script on CPU (dataset parquet is checked into
+`data/`, no re-download needed).
 
 ## Conclusions
 
@@ -114,9 +131,10 @@ src/bigram_lm.py           - bigram language-model classifier (hand-implemented,
 src/embeddings.py          - text2vec substitute (averaged Word2Vec)
 src/models.py              - SVM / Logistic Regression wrappers + evaluation
 src/lstm_model.py          - LSTM classifier (Keras, eq. 7-13 architecture)
-src/make_report_assets.py  - builds comparison table + bar chart from results
-run_all.py                 - main pipeline: load -> Table 1 grid -> Table 2 selection
+src/make_report_assets.py  - builds comparison table + bar charts from results
+run_all.py                 - Phase 1 pipeline: load -> Table 1 grid -> Table 2 selection
+tune_all.py                - Phase 2 pipeline: dev-only hyperparameter tuning per classifier
 data/                      - dataset (weibo_senti_100k parquet)
-results/                   - table1.json, table2.json, comparison_table.md, figures/
+results/                   - table1.json, table2.json, tuned_results.json, comparison_table.md, figures/
 report/                    - reference paper, guidelines, 2-page write-up (PDF) submission
 ```

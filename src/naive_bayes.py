@@ -18,7 +18,8 @@ from collections import Counter, defaultdict
 class NaiveBayesClassifier:
     """Multinomial Naive Bayes with Laplace (add-1) smoothing, eq. 1-2."""
 
-    def __init__(self):
+    def __init__(self, alpha=1.0):
+        self.alpha = alpha  # smoothing strength (paper's eq. 1-2 use alpha=1, i.e. Laplace)
         self.vocab = set()
         self.token_counts = {0: Counter(), 1: Counter()}
         self.class_token_totals = {0: 0, 1: 0}
@@ -37,8 +38,9 @@ class NaiveBayesClassifier:
 
     def _log_phi(self, token, y):
         V = len(self.vocab)
+        a = self.alpha
         return math.log(
-            (self.token_counts[y][token] + 1) / (self.class_token_totals[y] + V)
+            (self.token_counts[y][token] + a) / (self.class_token_totals[y] + a * V)
         )
 
     def log_prob_y1(self, tokens):

@@ -28,6 +28,22 @@ md.append("|---|---|---|---|---|")
 for key, m in table2.items():
     md.append(f"| {key} | {m['accuracy']:.4f} | {m['precision']:.4f} | {m['recall']:.4f} | {m['f1']:.4f} |")
 
+try:
+    with open("results/tuned_results.json") as f:
+        tuned = json.load(f)
+    md.append("")
+    md.append("### Phase 2 — Before/after tuning (dev-only selection, test touched once)")
+    md.append("| Classifier | Tokenization | Best Params | Dev F1 Before | Dev F1 After | Test F1 After |")
+    md.append("|---|---|---|---|---|---|")
+    for clf_name, r in tuned.items():
+        params = ", ".join(f"{k}={v}" for k, v in r["best_params"].items())
+        md.append(
+            f"| {clf_name} | {r['tokenization']} | {params} | "
+            f"{r['dev_before']['f1']:.4f} | {r['dev_after']['f1']:.4f} | {r['test_after']['f1']:.4f} |"
+        )
+except FileNotFoundError:
+    pass
+
 with open("results/comparison_table.md", "w") as f:
     f.write("\n".join(md))
 print("Wrote results/comparison_table.md")
@@ -52,3 +68,26 @@ for i, v in enumerate(f1s):
 plt.tight_layout()
 plt.savefig("results/figures/dev_f1_by_classifier.png", dpi=150)
 print("Wrote results/figures/dev_f1_by_classifier.png")
+
+# Before/after tuning chart
+try:
+    with open("results/tuned_results.json") as f:
+        tuned = json.load(f)
+    names = list(tuned.keys())
+    before = [tuned[n]["dev_before"]["f1"] for n in names]
+    after = [tuned[n]["dev_after"]["f1"] for n in names]
+    x = range(len(names))
+    width = 0.35
+    plt.figure(figsize=(8, 5))
+    plt.bar([i - width / 2 for i in x], before, width, label="Before tuning (paper defaults)", color="#999999")
+    plt.bar([i + width / 2 for i in x], after, width, label="After tuning (dev-selected)", color="#55A868")
+    plt.xticks(list(x), names, rotation=20, ha="right")
+    plt.ylabel("Dev F1")
+    plt.title("Phase 2: Before vs After Hyperparameter Tuning")
+    plt.legend()
+    plt.ylim(0, 1)
+    plt.tight_layout()
+    plt.savefig("results/figures/before_after_tuning.png", dpi=150)
+    print("Wrote results/figures/before_after_tuning.png")
+except FileNotFoundError:
+    pass

@@ -13,7 +13,8 @@ B, E = "<b>", "<e>"
 
 
 class BigramLMClassifier:
-    def __init__(self):
+    def __init__(self, alpha=1.0):
+        self.alpha = alpha  # smoothing strength (paper's eq. 6 uses add-1)
         # bigram_counts[y][(prev, cur)] = count ; unigram_counts[y][prev] = count (for normalization)
         self.bigram_counts = {0: Counter(), 1: Counter()}
         self.context_counts = {0: Counter(), 1: Counter()}
@@ -35,8 +36,9 @@ class BigramLMClassifier:
 
     def _log_p_next(self, prev, cur, y):
         V = len(self.vocab)
+        a = self.alpha
         return math.log(
-            (self.bigram_counts[y][(prev, cur)] + 1) / (self.context_counts[y][prev] + V)
+            (self.bigram_counts[y][(prev, cur)] + a) / (self.context_counts[y][prev] + a * V)
         )
 
     def _score(self, tokens, y):

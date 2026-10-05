@@ -31,20 +31,23 @@ def encode(token_lists, word2idx, max_len):
     return np.array(seqs, dtype=np.int32)
 
 
-def build_lstm_model(vocab_size, max_len, embedding_dim=256, lstm_units=64):
-    model = keras.Sequential([
+def build_lstm_model(vocab_size, max_len, embedding_dim=256, lstm_units=64,
+                      dropout=0.0, learning_rate=0.0005):
+    layers = [
         keras.layers.Input(shape=(max_len,)),
         keras.layers.Embedding(input_dim=vocab_size, output_dim=embedding_dim, mask_zero=True),
-        keras.layers.LSTM(lstm_units),
+        keras.layers.LSTM(lstm_units, dropout=dropout),
         keras.layers.Dense(1, activation="sigmoid"),
-    ])
-    optimizer = keras.optimizers.Adam(learning_rate=0.0005, beta_1=0.9, beta_2=0.999)
+    ]
+    model = keras.Sequential(layers)
+    optimizer = keras.optimizers.Adam(learning_rate=learning_rate, beta_1=0.9, beta_2=0.999)
     model.compile(optimizer=optimizer, loss="binary_crossentropy", metrics=["accuracy"])
     return model
 
 
 def train_and_predict(train_tokens, y_train, dev_tokens, y_dev, test_tokens=None,
-                       max_len=60, epochs=8, batch_size=16, seed=42):
+                       max_len=60, epochs=8, batch_size=16, seed=42,
+                       embedding_dim=256, lstm_units=64, dropout=0.0, learning_rate=0.0005):
     tf.random.set_seed(seed)
     word2idx = build_vocab(train_tokens)
     vocab_size = len(word2idx)
@@ -54,7 +57,8 @@ def train_and_predict(train_tokens, y_train, dev_tokens, y_dev, test_tokens=None
     ytr = np.array(y_train, dtype=np.float32)
     ydev = np.array(y_dev, dtype=np.float32)
 
-    model = build_lstm_model(vocab_size, max_len)
+    model = build_lstm_model(vocab_size, max_len, embedding_dim=embedding_dim,
+                              lstm_units=lstm_units, dropout=dropout, learning_rate=learning_rate)
     model.fit(
         Xtr, ytr,
         validation_data=(Xdev, ydev),
