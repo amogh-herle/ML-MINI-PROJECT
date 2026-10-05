@@ -1,0 +1,46 @@
+{
+  "lda_lr_issue_area": {
+    "num_topics": 100,
+    "best_C": 10.0,
+    "dev_after_f1": 0.3055359756480521,
+    "test_after": {
+      "accuracy": 0.48705096073517123,
+      "macro_precision": 0.3400756331790814,
+      "macro_recall": 0.26681365289762576,
+      "macro_f1": 0.2673732065509614
+    }
+  },
+  "lda_lr_issue": {
+    "num_topics": 100,
+    "best_C": 10.0,
+    "dev_after_f1": 0.08395363464586927,
+    "test_after": {
+      "accuracy": 0.19883040935672514,
+      "macro_precision": 0.09156461109257348,
+      "macro_recall": 0.10099708378107868,
+      "macro_f1": 0.0843442678689633
+    }
+  },
+  "doc2vec_lr_issue_area": {
+    "vector_size": 50,
+    "best_C": 1.0,
+    "dev_after_f1": 0.5219562597250549,
+    "test_after": {
+      "accuracy": 0.6223893065998329,
+      "macro_precision": 0.5087815575272221,
+      "macro_recall": 0.46044006793023684,
+      "macro_f1": 0.4769171315381714
+    }
+  },
+  "doc2vec_lr_issue": {
+    "vector_size": 50,
+    "best_C": 0.1,
+    "dev_after_f1": 0.3125270726902139,
+    "test_after": {
+      "accuracy": 0.4202172096908939,
+      "macro_precision": 0.3231665899548837,
+      "macro_recall": 0.29489171793405583,
+      "macro_f1": 0.2887880164010071
+    }
+  }
+}

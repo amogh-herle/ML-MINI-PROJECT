@@ -91,21 +91,77 @@ our fine-grained 0.08 matches its 0.13 in the same low range. Doc2Vec+LR
 its 0.48, likely due to our stricter class filtering (rare-class dropping)
 and the 4,000-character truncation.
 
-Full JSON: [`results/table1.json`](results/table1.json). Per-category
-precision/recall/F1 on `issue_area` (paper's Table 2 analog) is in
-[`results/comparison_table.md`](results/comparison_table.md).
+Full JSON: [`results/table1.json`](results/table1.json).
 
 ![Phase 1 test accuracy](results/figures/phase1_test_accuracy.png)
 
-### Phase 2 — Before/after hyperparameter tuning
+### Table 2 — Per-category test performance on issue_area (15 classes)
 
-See [`results/tuned_results.json`](results/tuned_results.json) and
-[`results/comparison_table.md`](results/comparison_table.md) for the full
-before/after table (generated after `tune_all.py` finishes — it's a long
-run: ~3 LDA refits + ~3 Doc2Vec refits + C sweeps, around 15-20 minutes on
-CPU).
+**lda_lr**
+
+| Category | Precision | Recall | F1 | Support |
+|---|---|---|---|---|
+| 1 | 0.38 | 0.88 | 0.53 | 277 |
+| 2 | 0.35 | 0.15 | 0.21 | 198 |
+| 3 | 0.38 | 0.05 | 0.09 | 94 |
+| 4 | 0.00 | 0.00 | 0.00 | 51 |
+| 5 | 0.00 | 0.00 | 0.00 | 16 |
+| 6 | 0.00 | 0.00 | 0.00 | 13 |
+| 7 | 0.71 | 0.23 | 0.34 | 44 |
+| 8 | 0.40 | 0.70 | 0.51 | 242 |
+| 9 | 0.39 | 0.07 | 0.12 | 157 |
+| 10 | 0.00 | 0.00 | 0.00 | 50 |
+| 11 | 0.00 | 0.00 | 0.00 | 8 |
+| 12 | 1.00 | 0.07 | 0.12 | 45 |
+| 13 | 0.00 | 0.00 | 0.00 | 2 |
+
+**doc2vec_lr**
+
+| Category | Precision | Recall | F1 | Support |
+|---|---|---|---|---|
+| 1 | 0.82 | 0.73 | 0.77 | 277 |
+| 2 | 0.61 | 0.57 | 0.59 | 198 |
+| 3 | 0.62 | 0.66 | 0.64 | 94 |
+| 4 | 0.30 | 0.45 | 0.36 | 51 |
+| 5 | 0.20 | 0.38 | 0.26 | 16 |
+| 6 | 0.22 | 0.54 | 0.31 | 13 |
+| 7 | 0.52 | 0.64 | 0.57 | 44 |
+| 8 | 0.70 | 0.59 | 0.64 | 242 |
+| 9 | 0.48 | 0.44 | 0.46 | 157 |
+| 10 | 0.39 | 0.36 | 0.38 | 50 |
+| 11 | 0.21 | 0.62 | 0.31 | 8 |
+| 12 | 0.73 | 0.73 | 0.73 | 45 |
+| 13 | 0.00 | 0.00 | 0.00 | 2 |
+
+Numbered categories follow the SCDB `issue_area` codes (1=Criminal
+Procedure, 2=Civil Rights, 3=First Amendment, 4=Due Process, 5=Privacy,
+6=Attorneys, 7=Unions, 8=Economic Activity, 9=Judicial Power, 10=Federalism,
+11=Interstate Relations, 12=Federal Taxation, 13=Miscellaneous). Doc2Vec
+clearly generalizes better to minority categories (5, 6, 11) than LDA, which
+collapses to the majority classes (1, 8) — same pattern the paper itself
+reports on its own Table 2.
+
+### Phase 2 — Before/after hyperparameter tuning (dev-selected, test touched once)
+
+| Model + Task | Extra Param | Best C | Test Acc Before | Test Acc After | Test Macro-F1 After |
+|---|---|---|---|---|---|
+| lda_lr_issue_area | num_topics=100 | 10.0 | 0.3935 | **0.4871** | 0.2674 |
+| lda_lr_issue | num_topics=100 | 10.0 | 0.0827 | **0.1988** | 0.0843 |
+| doc2vec_lr_issue_area | vector_size=50 | 1.0 | 0.5915 | **0.6224** | 0.4769 |
+| doc2vec_lr_issue | vector_size=50 | 0.1 | 0.3709 | **0.4202** | 0.2888 |
+
+Full JSON: [`results/tuned_results.json`](results/tuned_results.json).
 
 ![Before vs after tuning](results/figures/before_after_tuning.png)
+
+**Summary:** tuning gave clear gains everywhere this time (unlike the prior
+Weibo project, where the paper's defaults were already near-optimal). LDA
+benefited most from more topics (`num_topics` 50→100: issue_area test acc
++9.4pp, fine-grained issue +11.6pp) — 50 topics was simply too coarse to
+separate 15+ categories. Doc2Vec actually preferred a *smaller* embedding
+(`vector_size` 100→50): with ~5,600 training documents, a 200-dim vector
+overfits before the classifier sees enough signal, so halving it to 50
+improved both tasks (issue_area +3.1pp, fine-grained issue +4.9pp).
 
 ## Setup & running
 
