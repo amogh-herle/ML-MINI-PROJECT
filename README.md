@@ -1,184 +1,148 @@
 # ML-MINI-PROJECT
 
-Sentiment Analysis of Chinese Microblog (Weibo) Posts — full replication of the
-Stanford CS229 project *"Sentiment Analysis of Chinese Microblog Posts on
-Attitude Towards Vaccination Since the Distribution of COVID-19 Vaccines in
-China"* (Bai, He & Yuan, 2021), followed by hyperparameter tuning.
+Classification of US Supreme Court legal opinions — replication + hyperparameter
+tuning of the Stanford CS229 project *"Classification of Legal Text"*
+(Krithika Iyer, 2020).
 
 ## Problem statement
 
-Classify Weibo microblog posts as positive or negative sentiment, replicating
-the reference paper's full methodology: 4 tokenization schemes and 5 model
-families, matching its Table 1 (classifier x tokenization grid) and Table 2
-(test-set evaluation of the two best models).
+Classify US Supreme Court opinions into their legal subject-matter category,
+at two granularities:
+- **issue_area** — 15 broad human-curated categories (e.g. Criminal
+  Procedure, Civil Rights, First Amendment).
+- **issue** — ~260-280 fine-grained issue codes.
+
+Legal opinions use long, non-standard sentence structures that break typical
+NLP tooling; the paper explores whether topic-model and embedding features,
+fed into a simple classifier, can still recover the human-expert categories.
 
 ## Dataset
 
-The reference paper scraped ~60k Weibo posts about COVID-19 vaccination
-(Jan–Apr 2021) and hand-labelled ~3800 of them. **That dataset/code was never
-publicly released** (not on the CS229 project page, no linked repo).
+**Real dataset, no substitute needed.** The paper uses the Supreme Court
+Database (Washington University, http://scdb.wustl.edu) via the `textacy`
+package's bundled `SupremeCourt` dataset — the exact same source is still
+downloadable today (`textacy.datasets.SupremeCourt`, ~111MB, 8,419 opinions,
+1946-2016).
 
-As a substitute, we use **[weibo_senti_100k](https://github.com/SophonPlus/ChineseNlpCorpus)**
-(≈120k Weibo posts, binary sentiment labels derived from emoticons), downloaded
-via its HuggingFace parquet mirror (`dirtycomputer/weibo_senti_100k`,
-checked into `data/`). To stay in the same small-data regime as the paper, we
-downsample to the paper's exact split sizes: **2100 train / 850 dev / 850 test**.
+After dropping opinions with no `issue_area` label and issue codes with
+fewer than 10 examples (needed so every class can appear in train/dev/test),
+**7,971 opinions** remain, split 70/15/15 (train/dev/test), stratified by
+`issue_area`.
 
-Deviations from the paper, and why:
-- Topic is general Weibo sentiment, not specifically vaccine-related — no
-  public vaccine-labelled Chinese dataset exists.
-- Labels come from emoticons in the original posts; we strip emoticon tags
-  (e.g. `[哈哈]`) during preprocessing so the text itself, not the emoticon,
-  drives classification.
-- `text2vec` (paper's pretrained Chinese sentence-embedding library) is
-  substituted with a Word2Vec model trained on our own corpus, doc vectors
-  = mean of word vectors ([`src/embeddings.py`](src/embeddings.py)) — same
-  "dense embedding instead of raw counts" idea, no large pretrained download.
-- No post timestamps in the substitute dataset, so the paper's month-by-month
-  trend analysis (Table 3 / Figure 1, COVID vaccine rollout vs. sentiment)
-  **cannot be replicated** — noted as a limitation, not attempted.
+Deviation from the paper: opinions run very long (median ~34k characters);
+we truncate each to its first 4,000 characters before vectorizing, to keep
+LDA/Doc2Vec training tractable. Most opinions state the issue and holding
+early, so this keeps the dominant vocabulary.
 
-## Approach — methods replicated (paper Sec. 4)
+## Approach — methods replicated (paper's Experiments 1 & 2)
 
-| # | Method | Tokenizations used (paper Table 1) | Implementation |
+| # | Method | Paper section | Implementation |
 |---|---|---|---|
-| 1 | Naive Bayes, Laplace smoothing (eq. 1-2) + bigram/trigram linear interpolation (eq. 3) | unigram, bigram, trigram, jieba | [`src/naive_bayes.py`](src/naive_bayes.py) — hand-implemented from the paper's equations |
-| 2 | SVM (eq. 4) | unigram, bigram, trigram, jieba, text2vec | [`src/models.py`](src/models.py) — sklearn `SVC`, default params (paper doesn't mention tuning it) |
-| 3 | Logistic Regression (eq. 5) | unigram, bigram, trigram, jieba, text2vec | [`src/models.py`](src/models.py) — sklearn, `C` chosen per-tokenization on dev set, as the paper itself does |
-| 4 | Bigram language-model classifier (eq. 6) | unigram, jieba | [`src/bigram_lm.py`](src/bigram_lm.py) — hand-implemented from the paper's equation |
-| 5 | LSTM (eq. 7-13): embedding dim 256, 1 LSTM layer (64 units), sigmoid dense, Adam(lr=5e-4, β1=0.9, β2=0.999), batch 16 | unigram, bigram, trigram, jieba | [`src/lstm_model.py`](src/lstm_model.py) — Keras/TensorFlow, exact architecture from the paper |
+| 1 | LDA (topic model) + Logistic Regression | Experiment 1 | [`src/lda_lr.py`](src/lda_lr.py) — gensim `Dictionary` → `TfidfModel` → `LdaModel`, document = topic-probability vector, sklearn `LogisticRegression` on top |
+| 2 | Doc2Vec (paragraph embeddings) + Logistic Regression | Experiment 2 | [`src/doc2vec_lr.py`](src/doc2vec_lr.py) — gensim `Doc2Vec`, document = learned paragraph vector, sklearn `LogisticRegression` on top |
 
-**Preprocessing** ([`src/preprocessing.py`](src/preprocessing.py)): drop posts
-containing `【`/`】` (paper's filter for media/news reposts), strip URLs/
-mentions/emoticon tags, remove Chinese stopwords; 4 tokenizers (jieba,
-character unigram/bigram/trigram) matching the paper's Sec. 3.
+**Experiment 3 (BERT) is not replicated.** The paper's own BERT attempt ran
+out of memory on Google Colab (even the paid high-RAM tier) and produced no
+results — there is nothing to replicate numerically, only a limitation to
+note.
 
-**Phase 1 (replicate):** run every (classifier, tokenization) combination from
-the paper's Table 1 with the paper's described settings — produces our own
-Table 1 analog ([`results/table1.json`](results/table1.json),
-[`results/comparison_table.md`](results/comparison_table.md)).
+**Preprocessing** ([`src/preprocessing.py`](src/preprocessing.py)): load via
+textacy, drop unlabeled/rare classes, truncate to 4,000 chars, lowercase +
+regex word tokenization + English stopword removal.
 
-**Phase 2 (select + test):** pick the top-2 models by dev F1 (mirrors the
-paper's selection of "LSTM bigram" + "SVM text2vec" for its Table 2), evaluate
-them once on the held-out test set → [`results/table2.json`](results/table2.json).
+**Phase 1 (replicate):** [`run_all.py`](run_all.py) trains LDA+LR and
+Doc2Vec+LR, evaluated on both `issue_area` (15-label) and `issue`
+(fine-grained) tasks, with the paper's rough default settings (LDA
+`num_topics=50`, Doc2Vec `vector_size=100`, LR `C=1.0`) → produces our Table
+1/2 analogs ([`results/table1.json`](results/table1.json)).
 
-**Phase 2 (tune):** [`tune_all.py`](tune_all.py) takes each classifier's best
-tokenization from Phase 1 and tunes its hyperparameters on the dev set only
-(Naive Bayes `alpha`, Bigram-LM smoothing `alpha`, SVM `C`/`kernel`,
-Logistic Regression `C` over a wider grid, LSTM `embedding_dim`/`lstm_units`/
-`dropout`), then touches the test set exactly once with the winning config
-per model → [`results/tuned_results.json`](results/tuned_results.json).
+**Phase 2 (tune):** [`tune_all.py`](tune_all.py) tunes the feature
+extractor's main hyperparameter (LDA `num_topics` ∈ {20, 50, 100}, Doc2Vec
+`vector_size` ∈ {50, 100, 200}) by `issue_area` dev accuracy, then tunes each
+downstream Logistic Regression's `C` per label task on dev, touching test
+exactly once per final config → [`results/tuned_results.json`](results/tuned_results.json).
+
+## A note on the paper's own Table 1
+
+The paper's text says: *"The classification accuracy for the 279 issue_code
+is around 0.133. When only the issue_areas (15 categories) are considered,
+the classification accuracy jumps to 0.47."* — i.e. **15-label ≈ 0.47,
+279-label ≈ 0.13** for LDA+LR. But the paper's **printed Table 1 has the
+columns swapped** (`15-Labels = 0.13`, `279 Labels = 0.47`), which
+contradicts its own text (fewer, broader classes should be *easier*, not
+harder, to predict). We report our results using the paper's own text-stated
+mapping as ground truth, and note this inconsistency for transparency.
 
 ## Results
 
-### Table 1 — Phase 1 replication grid (paper's settings, no tuning)
+### Table 1 — Phase 1 replication (paper's default settings)
 
-| Classifier | Tokenization | Train Acc | Dev Acc | Dev Precision | Dev Recall | Dev F1 |
-|---|---|---|---|---|---|---|
-| naive_bayes | unigram | 0.8124 | 0.6400 | 0.6684 | 0.5950 | 0.6295 |
-| naive_bayes | bigram | 0.9776 | 0.6329 | 0.6582 | 0.5950 | 0.6250 |
-| naive_bayes | trigram | 0.9881 | 0.6306 | 0.6311 | 0.6773 | 0.6534 |
-| naive_bayes | jieba | 0.9429 | 0.6412 | 0.6675 | 0.6018 | 0.6330 |
-| naive_bayes | bigram_trigram_interpolated | 0.9881 | 0.6588 | 0.6705 | 0.6613 | 0.6659 |
-| bigram_model | unigram | 0.9814 | 0.6318 | 0.6384 | 0.6545 | 0.6463 |
-| bigram_model | jieba | 0.9876 | 0.5906 | 0.6005 | 0.6087 | 0.6045 |
-| svm | unigram | 0.8352 | 0.6471 | 0.6252 | 0.7826 | 0.6951 |
-| svm | bigram | 0.8871 | 0.6012 | 0.5768 | 0.8421 | 0.6847 |
-| svm | trigram | 0.8548 | 0.5353 | 0.5269 | 0.9405 | 0.6754 |
-| svm | jieba | 0.7962 | 0.6129 | 0.5877 | 0.8284 | 0.6876 |
-| svm | text2vec | 0.5681 | 0.5376 | 0.5296 | 0.8993 | 0.6667 |
-| logistic_regression | unigram | 0.7424 | 0.6600 | 0.6321 | 0.8101 | 0.7101 |
-| logistic_regression | bigram | 0.7419 | 0.5847 | 0.5588 | 0.9130 | 0.6933 |
-| logistic_regression | trigram | 0.6448 | 0.5482 | 0.5348 | 0.9314 | 0.6795 |
-| logistic_regression | jieba | 0.7267 | 0.6024 | 0.5838 | 0.7895 | 0.6712 |
-| logistic_regression | text2vec | 0.6105 | 0.5671 | 0.5631 | 0.7048 | 0.6260 |
-| lstm | unigram | 0.9738 | 0.6188 | 0.6101 | 0.7162 | 0.6589 |
-| lstm | bigram | 0.9919 | 0.5612 | 0.6053 | 0.4211 | 0.4966 |
-| lstm | trigram | 0.9500 | 0.5035 | 0.5153 | 0.5789 | 0.5453 |
-| lstm | jieba | 0.9900 | 0.5976 | 0.6004 | 0.6499 | 0.6242 |
-
-Full JSON: [`results/table1.json`](results/table1.json).
-
-![Dev F1 by classifier](results/figures/dev_f1_by_classifier.png)
-
-### Table 2 — Best 2 models by dev F1, test-set performance
-
-| Model | Accuracy | Precision | Recall | F1 |
-|---|---|---|---|---|
-| logistic_regression_unigram | 0.6553 | 0.6321 | 0.7922 | 0.7031 |
-| svm_unigram | 0.6647 | 0.6435 | 0.7831 | 0.7065 |
-
-Full JSON: [`results/table2.json`](results/table2.json).
-
-### Phase 2 — Before/after hyperparameter tuning (dev-only selection, test touched once)
-
-| Classifier | Tokenization | Best Params | Dev F1 Before | Dev F1 After | Test F1 After |
+| Model | Label task | Dev Acc | Dev Macro-F1 | Test Acc | Test Macro-F1 |
 |---|---|---|---|---|---|
-| naive_bayes | trigram | alpha=0.1 | 0.6534 | 0.6566 | 0.6522 |
-| bigram_model | unigram | alpha=1.0 | 0.6463 | 0.6463 | 0.6426 |
-| svm | unigram | C=1.0, kernel=rbf | 0.6951 | 0.6951 | 0.7065 |
-| logistic_regression | unigram | C=0.1 | 0.7101 | 0.7101 | 0.7031 |
-| lstm | unigram | embedding_dim=128, lstm_units=64, dropout=0.3 | 0.6589 | 0.6569 | 0.6552 |
+| lda_lr | issue_area (15-label) | 0.3824 | 0.1557 | 0.3935 | 0.1487 |
+| lda_lr | issue (fine-grained) | 0.0803 | 0.0116 | 0.0827 | 0.0129 |
+| doc2vec_lr | issue_area (15-label) | 0.5757 | 0.4742 | 0.5915 | 0.4629 |
+| doc2vec_lr | issue (fine-grained) | 0.3674 | 0.2992 | 0.3709 | 0.2901 |
 
-Full JSON: [`results/tuned_results.json`](results/tuned_results.json).
+**Comparison with the paper** (using its text-stated mapping): our LDA+LR
+15-label test accuracy (0.39) sits reasonably close to the paper's 0.47;
+our fine-grained 0.08 matches its 0.13 in the same low range. Doc2Vec+LR
+15-label (0.59) is close to the paper's 0.63; fine-grained (0.37) is below
+its 0.48, likely due to our stricter class filtering (rare-class dropping)
+and the 4,000-character truncation.
+
+Full JSON: [`results/table1.json`](results/table1.json). Per-category
+precision/recall/F1 on `issue_area` (paper's Table 2 analog) is in
+[`results/comparison_table.md`](results/comparison_table.md).
+
+![Phase 1 test accuracy](results/figures/phase1_test_accuracy.png)
+
+### Phase 2 — Before/after hyperparameter tuning
+
+See [`results/tuned_results.json`](results/tuned_results.json) and
+[`results/comparison_table.md`](results/comparison_table.md) for the full
+before/after table (generated after `tune_all.py` finishes — it's a long
+run: ~3 LDA refits + ~3 Doc2Vec refits + C sweeps, around 15-20 minutes on
+CPU).
 
 ![Before vs after tuning](results/figures/before_after_tuning.png)
-
-**Summary:** Naive Bayes gained the most from tuning (dev F1 0.653 → 0.657,
-`alpha` dropping from 1.0 to 0.1 — less smoothing fit this data better).
-SVM, Logistic Regression, Bigram Model and LSTM were already close to their
-dev-optimal settings in Phase 1 (paper's defaults / the per-tokenization C
-search already built into the paper's own methodology), so Phase 2 found
-little further room — their test F1 moves are within noise of the Phase 1
-numbers, which is itself a useful finding: the paper's untuned baselines
-were not far from optimal for this dataset.
 
 ## Setup & running
 
 ```bash
 pip install -r requirements.txt
-python run_all.py                    # Phase 1: full replication + selection -> results/table1.json, table2.json
-python tune_all.py                   # Phase 2: dev-only hyperparameter tuning -> results/tuned_results.json
+python run_all.py                    # Phase 1: downloads corpus (~111MB, cached after first run), replicates both experiments
+python tune_all.py                   # Phase 2: dev-only hyperparameter tuning (slow: several LDA/Doc2Vec refits)
 python src/make_report_assets.py     # builds comparison_table.md + charts from the results
 ```
 
-Runtime: ~2 minutes per script on CPU (dataset parquet is checked into
-`data/`, no re-download needed).
-
 ## Conclusions
 
-- Our dev/test accuracies (0.53–0.66) sit below the paper's (0.62–0.75)
-  mostly because of the dataset swap: our substitute's emoticon-derived
-  labels are noisier than hand-labelled vaccine-opinion posts, and the topic
-  is broader/more varied than a single-topic (vaccination) corpus.
-- The relative *pattern* across tokenizations/models matches the paper well:
-  n-gram SVM and LSTM models show heavy train/dev gaps (overfitting, same as
-  the paper's Table 1 — e.g. SVM trigram train 0.85 vs. the paper's near-1.0
-  pattern), and jieba/unigram tokenization generalizes better than raw n-grams
-  for linear models, consistent with the paper's own best settings.
-- Naive Bayes bigram+trigram interpolation gives a small dev-F1 bump over
-  either alone, matching the paper's motivation for eq. 3, though our dev
-  showed best results at a different `lambda` than the paper's 0.8 — likely
-  dataset-dependent.
-- Limitation: no timestamp metadata means the paper's trend-analysis
-  application (Sec. 6) could not be replicated on this substitute dataset.
-- Future work: swap in a genuine vaccine-labelled Weibo corpus if one becomes
-  available, and use the real `text2vec` pretrained model instead of our
-  from-scratch Word2Vec substitute.
+- Both the paper's and our results agree on the overall pattern: Doc2Vec
+  embeddings consistently outperform LDA topic-distribution features for
+  this task, and the coarser 15-category task is much easier than the
+  260+-category fine-grained task — unsurprising given how thin per-class
+  training data gets at that granularity.
+- LDA's macro-F1 is far below its accuracy (e.g. 0.156 vs 0.382 on
+  issue_area dev) — a sign it's defaulting to the majority classes
+  (Criminal Procedure, Economic Activity) and failing on rare categories,
+  matching the paper's own observation that large document collections
+  "do not necessarily lead to better results" for some categories.
+- We did not replicate BERT: the paper's own attempt failed on memory
+  limits, so there is no baseline number to reproduce. Future work could
+  revisit this with a long-document Transformer variant (Longformer,
+  Reformer) as the paper itself suggests.
 
 ## Repo structure
 
 ```
-src/preprocessing.py       - cleaning, filtering, 4 tokenizers
-src/naive_bayes.py         - Naive Bayes + bigram/trigram interpolation (hand-implemented, eq. 1-3)
-src/bigram_lm.py           - bigram language-model classifier (hand-implemented, eq. 6)
-src/embeddings.py          - text2vec substitute (averaged Word2Vec)
-src/models.py              - SVM / Logistic Regression wrappers + evaluation
-src/lstm_model.py          - LSTM classifier (Keras, eq. 7-13 architecture)
-src/make_report_assets.py  - builds comparison table + bar charts from results
-run_all.py                 - Phase 1 pipeline: load -> Table 1 grid -> Table 2 selection
-tune_all.py                - Phase 2 pipeline: dev-only hyperparameter tuning per classifier
-data/                      - dataset (weibo_senti_100k parquet)
-results/                   - table1.json, table2.json, tuned_results.json, comparison_table.md, figures/
-report/                    - reference paper, guidelines, 2-page write-up (PDF) submission
+src/preprocessing.py       - corpus loading (textacy), cleaning, tokenizing, train/dev/test split
+src/lda_lr.py              - LDA topic-distribution featurizer + Logistic Regression (Experiment 1)
+src/doc2vec_lr.py          - Doc2Vec paragraph-embedding featurizer + Logistic Regression (Experiment 2)
+src/make_report_assets.py  - builds comparison table + charts from results
+run_all.py                 - Phase 1 pipeline: load -> featurize -> train/eval both experiments, both label tasks
+tune_all.py                - Phase 2 pipeline: dev-only hyperparameter tuning per feature extractor + classifier
+data/                      - cached textacy SupremeCourt corpus (downloaded on first run)
+results/                   - table1.json, tuned_results.json, comparison_table.md, figures/
+report/                    - reference paper, guidelines, write-up
 ```

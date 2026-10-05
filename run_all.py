@@ -1,17 +1,18 @@
 """
-Full replication of the reference paper's experiment grid:
-"Sentiment Analysis of Chinese Microblog Posts on Attitude Towards Vaccination
-Since the Distribution of COVID-19 Vaccines in China" (Bai, He, Yuan — Stanford
-CS229, 2021).
+Phase 1: replicate the reference paper's experiments —
+"Classification of Legal Text" (Iyer, Stanford CS229, 2020).
 
-Reproduces Table 1 (classifier x tokenization grid: train/dev acc, dev P/R/F1),
-Table 2 (test-set performance of the two best dev models), and documents the
-Table 3 / Figure 1 trend-analysis limitation (no timestamps in substitute data).
+Paper's Experiment 1 (LDA + LR) and Experiment 2 (Doc2Vec + LR), evaluated on
+both label granularities:
+  - issue_area: 15 broad categories  (paper's Table 1 "15-Labels" column)
+  - issue:      ~260-280 fine issue codes (paper's "279 Labels" column)
 
-Dataset substitute: the original paper's scraped/hand-labelled Weibo vaccine
-dataset was never publicly released, so we use weibo_senti_100k (SophonPlus /
-ChineseNlpCorpus) downsampled to the paper's scale (2100/850/850 split). See
-README.md for full list of deviations.
+Experiment 3 (BERT) is not replicated: the paper's own BERT attempt ran out
+of memory and produced no results to compare against (documented in README).
+
+Dataset: real Supreme Court Database corpus via textacy.datasets.SupremeCourt
+(~8,400 opinions, 1946-2016) — the same dataset the paper itself used, no
+substitute needed this time.
 
 Usage:
     python run_all.py
@@ -19,214 +20,129 @@ Usage:
 import json
 import sys
 import time
-import pandas as pd
-from sklearn.model_selection import train_test_split
+from collections import Counter
 
 sys.path.insert(0, "src")
-from preprocessing import preprocess_dataframe, TOKENIZERS
-from models import (
-    build_naive_bayes, build_logistic_regression, build_svm,
-    fit_predict, fit_predict_dense, evaluate,
-)
-from naive_bayes import NaiveBayesClassifier, InterpolatedNaiveBayes
-from bigram_lm import BigramLMClassifier
-from embeddings import AveragedWord2VecVectorizer
-from lstm_model import train_and_predict as lstm_train_predict
+from preprocessing import load_corpus, split_records, simple_tokenize
+from lda_lr import LDAFeaturizer, train_lda_lr
+from doc2vec_lr import Doc2VecFeaturizer, train_doc2vec_lr
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 
-DATA_PATH = "data/weibo_senti_100k.parquet"
-RESULTS_DIR = "results"
 SEED = 42
-N_TRAIN, N_DEV, N_TEST = 2100, 850, 850
+MIN_ISSUE_COUNT = 10   # drop fine-grained issue codes with too few examples to stratify/evaluate
+MIN_AREA_COUNT = 2      # drop issue_area classes that can't be stratified
 
 
-def load_split():
-    df = pd.read_parquet(DATA_PATH)
-    df = preprocess_dataframe(df, text_col="review", label_col="label")
-    df = df.sample(n=N_TRAIN + N_DEV + N_TEST, random_state=SEED).reset_index(drop=True)
-    train_df, rest = train_test_split(df, train_size=N_TRAIN, random_state=SEED, stratify=df["label"])
-    dev_df, test_df = train_test_split(rest, train_size=N_DEV, random_state=SEED, stratify=rest["label"])
-    return train_df.reset_index(drop=True), dev_df.reset_index(drop=True), test_df.reset_index(drop=True)
+def filter_rare_classes(records):
+    issue_counts = Counter(r["issue"] for r in records)
+    area_counts = Counter(r["issue_area"] for r in records)
+    return [
+        r for r in records
+        if issue_counts[r["issue"]] >= MIN_ISSUE_COUNT and area_counts[r["issue_area"]] >= MIN_AREA_COUNT
+    ]
 
 
-def tok_all(df, name):
-    return df["review"].apply(TOKENIZERS[name]).tolist()
+def evaluate_multiclass(y_true, y_pred):
+    acc = accuracy_score(y_true, y_pred)
+    p, r, f1, _ = precision_recall_fscore_support(y_true, y_pred, average="macro", zero_division=0)
+    return {"accuracy": acc, "macro_precision": p, "macro_recall": r, "macro_f1": f1}
+
+
+def per_class_report(y_true, y_pred, labels):
+    p, r, f1, support = precision_recall_fscore_support(
+        y_true, y_pred, labels=labels, zero_division=0
+    )
+    return {
+        str(label): {"precision": float(p[i]), "recall": float(r[i]), "f1": float(f1[i]), "support": int(support[i])}
+        for i, label in enumerate(labels)
+    }
 
 
 def main():
     t0 = time.time()
-    print("Loading + splitting data (paper scale: 2100/850/850)...")
-    train_df, dev_df, test_df = load_split()
-    ytr, ydev, ytest = train_df["label"].tolist(), dev_df["label"].tolist(), test_df["label"].tolist()
+    print("Loading Supreme Court corpus (textacy)...")
+    records = load_corpus()
+    records = filter_rare_classes(records)
+    print(f"{len(records)} records after filtering rare classes")
 
-    # Pre-tokenize once per scheme (reused across classifiers)
-    tokenized = {
-        split: {name: tok_all(df, name) for name in ["unigram", "bigram", "trigram", "jieba"]}
-        for split, df in [("train", train_df), ("dev", dev_df), ("test", test_df)]
+    train, dev, test = split_records(records)
+    print(f"train={len(train)} dev={len(dev)} test={len(test)}")
+
+    print("Tokenizing...")
+    train_tok = [simple_tokenize(r["text"]) for r in train]
+    dev_tok = [simple_tokenize(r["text"]) for r in dev]
+    test_tok = [simple_tokenize(r["text"]) for r in test]
+
+    y_area_train = [r["issue_area"] for r in train]
+    y_area_dev = [r["issue_area"] for r in dev]
+    y_area_test = [r["issue_area"] for r in test]
+    y_issue_train = [r["issue"] for r in train]
+    y_issue_dev = [r["issue"] for r in dev]
+    y_issue_test = [r["issue"] for r in test]
+
+    results = {"table1_accuracy": {}, "table2_per_category_issue_area": {}}
+
+    # ---------------- Experiment 1: LDA + LR ----------------
+    print("Training LDA featurizer (num_topics=50)...")
+    lda_feat = LDAFeaturizer(num_topics=50, passes=5, seed=SEED)
+    Xtr_lda = lda_feat.fit_transform(train_tok)
+    Xdev_lda = lda_feat.transform(dev_tok)
+    Xtest_lda = lda_feat.transform(test_tok)
+
+    print("LDA + LR: issue_area (15-label)...")
+    clf = train_lda_lr(Xtr_lda, y_area_train, C=1.0)
+    dev_pred = clf.predict(Xdev_lda)
+    test_pred = clf.predict(Xtest_lda)
+    results["table1_accuracy"]["lda_lr_issue_area"] = {
+        "dev": evaluate_multiclass(y_area_dev, dev_pred),
+        "test": evaluate_multiclass(y_area_test, test_pred),
+    }
+    results["table2_per_category_issue_area"]["lda_lr"] = per_class_report(
+        y_area_test, test_pred, labels=sorted(set(y_area_train))
+    )
+
+    print("LDA + LR: issue (fine-grained)...")
+    clf = train_lda_lr(Xtr_lda, y_issue_train, C=1.0)
+    dev_pred = clf.predict(Xdev_lda)
+    test_pred = clf.predict(Xtest_lda)
+    results["table1_accuracy"]["lda_lr_issue"] = {
+        "dev": evaluate_multiclass(y_issue_dev, dev_pred),
+        "test": evaluate_multiclass(y_issue_test, test_pred),
     }
 
-    table1 = {}  # table1[classifier][tokenization] = {train, dev}
+    # ---------------- Experiment 2: Doc2Vec + LR ----------------
+    print("Training Doc2Vec featurizer (vector_size=100)...")
+    d2v_feat = Doc2VecFeaturizer(vector_size=100, window=8, epochs=20, seed=SEED)
+    Xtr_d2v = d2v_feat.fit_transform(train_tok)
+    Xdev_d2v = d2v_feat.transform(dev_tok)
+    Xtest_d2v = d2v_feat.transform(test_tok)
 
-    # ---------------- Naive Bayes (Sec 4.1): unigram/bigram/trigram/jieba ----------------
-    print("Naive Bayes...")
-    table1["naive_bayes"] = {}
-    for tok_name in ["unigram", "bigram", "trigram", "jieba"]:
-        nb = NaiveBayesClassifier().fit(tokenized["train"][tok_name], ytr)
-        train_pred = nb.predict(tokenized["train"][tok_name])
-        dev_pred = nb.predict(tokenized["dev"][tok_name])
-        table1["naive_bayes"][tok_name] = {
-            "train_acc": evaluate(ytr, train_pred)["accuracy"],
-            "dev": evaluate(ydev, dev_pred),
-        }
-    # Linear interpolation of bigram+trigram NB (eq. 3), lambda sweep like the paper
-    print("Naive Bayes (bigram+trigram interpolation)...")
-    best_lam, best_f1 = None, -1
-    for lam in [0.2, 0.5, 0.8]:
-        inb = InterpolatedNaiveBayes(lam=lam).fit(tokenized["train"]["bigram"], tokenized["train"]["trigram"], ytr)
-        dev_pred = inb.predict(tokenized["dev"]["bigram"], tokenized["dev"]["trigram"])
-        f1 = evaluate(ydev, dev_pred)["f1"]
-        if f1 > best_f1:
-            best_f1, best_lam = f1, lam
-    inb = InterpolatedNaiveBayes(lam=best_lam).fit(tokenized["train"]["bigram"], tokenized["train"]["trigram"], ytr)
-    train_pred = inb.predict(tokenized["train"]["bigram"], tokenized["train"]["trigram"])
-    dev_pred = inb.predict(tokenized["dev"]["bigram"], tokenized["dev"]["trigram"])
-    table1["naive_bayes"]["bigram_trigram_interpolated"] = {
-        "lambda": best_lam,
-        "train_acc": evaluate(ytr, train_pred)["accuracy"],
-        "dev": evaluate(ydev, dev_pred),
+    print("Doc2Vec + LR: issue_area (15-label)...")
+    clf = train_doc2vec_lr(Xtr_d2v, y_area_train, C=1.0)
+    dev_pred = clf.predict(Xdev_d2v)
+    test_pred = clf.predict(Xtest_d2v)
+    results["table1_accuracy"]["doc2vec_lr_issue_area"] = {
+        "dev": evaluate_multiclass(y_area_dev, dev_pred),
+        "test": evaluate_multiclass(y_area_test, test_pred),
+    }
+    results["table2_per_category_issue_area"]["doc2vec_lr"] = per_class_report(
+        y_area_test, test_pred, labels=sorted(set(y_area_train))
+    )
+
+    print("Doc2Vec + LR: issue (fine-grained)...")
+    clf = train_doc2vec_lr(Xtr_d2v, y_issue_train, C=1.0)
+    dev_pred = clf.predict(Xdev_d2v)
+    test_pred = clf.predict(Xtest_d2v)
+    results["table1_accuracy"]["doc2vec_lr_issue"] = {
+        "dev": evaluate_multiclass(y_issue_dev, dev_pred),
+        "test": evaluate_multiclass(y_issue_test, test_pred),
     }
 
-    # ---------------- Bigram Language Model (Sec 4.4): unigram/jieba only ----------------
-    print("Bigram language model...")
-    table1["bigram_model"] = {}
-    for tok_name in ["unigram", "jieba"]:
-        blm = BigramLMClassifier().fit(tokenized["train"][tok_name], ytr)
-        train_pred = blm.predict(tokenized["train"][tok_name])
-        dev_pred = blm.predict(tokenized["dev"][tok_name])
-        table1["bigram_model"][tok_name] = {
-            "train_acc": evaluate(ytr, train_pred)["accuracy"],
-            "dev": evaluate(ydev, dev_pred),
-        }
-
-    # ---------------- SVM (Sec 4.2): unigram/bigram/trigram/jieba/text2vec ----------------
-    print("SVM...")
-    table1["svm"] = {}
-    for tok_name in ["unigram", "bigram", "trigram", "jieba"]:
-        vec, clf = build_svm()
-        train_pred, dev_pred, _ = fit_predict(vec, clf, tokenized["train"][tok_name], ytr, tokenized["dev"][tok_name])
-        table1["svm"][tok_name] = {
-            "train_acc": evaluate(ytr, train_pred)["accuracy"],
-            "dev": evaluate(ydev, dev_pred),
-        }
-    print("SVM (text2vec substitute: averaged word2vec)...")
-    w2v = AveragedWord2VecVectorizer(vector_size=100)
-    Xtr_vec = w2v.fit_transform(tokenized["train"]["jieba"])
-    Xdev_vec = w2v.transform(tokenized["dev"]["jieba"])
-    Xtest_vec = w2v.transform(tokenized["test"]["jieba"])
-    _, svm_clf = build_svm()
-    train_pred, dev_pred, test_pred_svm_t2v = fit_predict_dense(svm_clf, Xtr_vec, ytr, Xdev_vec, Xtest_vec)
-    table1["svm"]["text2vec"] = {
-        "train_acc": evaluate(ytr, train_pred)["accuracy"],
-        "dev": evaluate(ydev, dev_pred),
-    }
-
-    # ---------------- Logistic Regression (Sec 4.3): unigram/bigram/trigram/jieba/text2vec ----------------
-    print("Logistic Regression (per-tokenization C search on dev, as in paper)...")
-    table1["logistic_regression"] = {}
-    for tok_name in ["unigram", "bigram", "trigram", "jieba"]:
-        best_C, best_f1, best_pack = None, -1, None
-        for C in [0.1, 0.5, 1.0, 2.0, 5.0]:
-            vec, clf = build_logistic_regression(C=C)
-            train_pred, dev_pred, _ = fit_predict(vec, clf, tokenized["train"][tok_name], ytr, tokenized["dev"][tok_name])
-            f1 = evaluate(ydev, dev_pred)["f1"]
-            if f1 > best_f1:
-                best_f1, best_C = f1, C
-                best_pack = (train_pred, dev_pred)
-        table1["logistic_regression"][tok_name] = {
-            "best_C": best_C,
-            "train_acc": evaluate(ytr, best_pack[0])["accuracy"],
-            "dev": evaluate(ydev, best_pack[1]),
-        }
-    print("Logistic Regression (text2vec substitute)...")
-    best_C, best_f1, best_pack = None, -1, None
-    for C in [0.1, 0.5, 1.0, 2.0, 5.0]:
-        clf = build_logistic_regression(C=C)[1]
-        train_pred, dev_pred, test_pred = fit_predict_dense(clf, Xtr_vec, ytr, Xdev_vec, Xtest_vec)
-        f1 = evaluate(ydev, dev_pred)["f1"]
-        if f1 > best_f1:
-            best_f1, best_C = f1, C
-            best_pack = (train_pred, dev_pred, test_pred)
-    table1["logistic_regression"]["text2vec"] = {
-        "best_C": best_C,
-        "train_acc": evaluate(ytr, best_pack[0])["accuracy"],
-        "dev": evaluate(ydev, best_pack[1]),
-    }
-    test_pred_lr_t2v = best_pack[2]
-
-    # ---------------- LSTM (Sec 4.5): unigram/bigram/trigram/jieba ----------------
-    print("LSTM (this takes the longest)...")
-    table1["lstm"] = {}
-    lstm_test_preds = {}
-    for tok_name in ["unigram", "bigram", "trigram", "jieba"]:
-        train_pred, dev_pred, test_pred = lstm_train_predict(
-            tokenized["train"][tok_name], ytr, tokenized["dev"][tok_name], ydev,
-            test_tokens=tokenized["test"][tok_name], epochs=8,
-        )
-        table1["lstm"][tok_name] = {
-            "train_acc": evaluate(ytr, train_pred)["accuracy"],
-            "dev": evaluate(ydev, dev_pred),
-        }
-        lstm_test_preds[tok_name] = test_pred
-
-    with open(f"{RESULTS_DIR}/table1.json", "w") as f:
-        json.dump(table1, f, indent=2, ensure_ascii=False)
-    print(f"Table 1 written to {RESULTS_DIR}/table1.json")
-
-    # ---------------- Table 2: pick best 2 models by dev F1, evaluate on test ----------------
-    print("Selecting best 2 models by dev F1 for Table 2...")
-    flat = []
-    for clf_name, toks in table1.items():
-        for tok_name, metrics in toks.items():
-            flat.append((clf_name, tok_name, metrics["dev"]["f1"]))
-    flat.sort(key=lambda x: -x[2])
-    top2 = flat[:2]
-    print("Top 2 by dev F1:", top2)
-
-    table2 = {}
-    for clf_name, tok_name, _ in top2:
-        key = f"{clf_name}_{tok_name}"
-        if clf_name == "svm" and tok_name == "text2vec":
-            test_pred = test_pred_svm_t2v
-        elif clf_name == "logistic_regression" and tok_name == "text2vec":
-            test_pred = test_pred_lr_t2v
-        elif clf_name == "lstm":
-            test_pred = lstm_test_preds[tok_name]
-        elif clf_name == "naive_bayes":
-            nb = NaiveBayesClassifier().fit(tokenized["train"][tok_name], ytr)
-            test_pred = nb.predict(tokenized["test"][tok_name])
-        elif clf_name == "bigram_model":
-            blm = BigramLMClassifier().fit(tokenized["train"][tok_name], ytr)
-            test_pred = blm.predict(tokenized["test"][tok_name])
-        elif clf_name == "svm":
-            vec, clf = build_svm()
-            _, _, test_pred = fit_predict(vec, clf, tokenized["train"][tok_name], ytr, tokenized["dev"][tok_name], tokenized["test"][tok_name])
-        elif clf_name == "logistic_regression":
-            best_C = table1["logistic_regression"][tok_name]["best_C"]
-            vec, clf = build_logistic_regression(C=best_C)
-            _, _, test_pred = fit_predict(vec, clf, tokenized["train"][tok_name], ytr, tokenized["dev"][tok_name], tokenized["test"][tok_name])
-        else:
-            test_pred = None
-        table2[key] = evaluate(ytest, test_pred) if test_pred is not None else None
-
-    with open(f"{RESULTS_DIR}/table2.json", "w") as f:
-        json.dump(table2, f, indent=2, ensure_ascii=False)
-    print(json.dumps(table2, indent=2, ensure_ascii=False))
-    print(f"Table 2 written to {RESULTS_DIR}/table2.json")
-
-    print("\nNOTE (Table 3 / trend analysis): the substitute dataset (weibo_senti_100k) "
-          "has no post timestamps, so the paper's month-by-month positive-sentiment trend "
-          "(Table 3, Figure 1) cannot be replicated. Documented as a limitation in README.md.")
-
-    print(f"\nTotal runtime: {time.time() - t0:.1f}s")
+    with open("results/table1.json", "w") as f:
+        json.dump(results, f, indent=2, ensure_ascii=False)
+    print(json.dumps(results["table1_accuracy"], indent=2, ensure_ascii=False))
+    print(f"\nWritten to results/table1.json")
+    print(f"Total runtime: {time.time() - t0:.1f}s")
 
 
 if __name__ == "__main__":

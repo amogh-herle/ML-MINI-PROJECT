@@ -1,93 +1,87 @@
-"""Generate a markdown comparison table + bar chart from results/table1.json and
-results/table2.json, for the README / write-up."""
+"""Generate a markdown comparison table + bar charts from results/table1.json and
+results/tuned_results.json."""
 import json
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 with open("results/table1.json") as f:
-    table1 = json.load(f)
-with open("results/table2.json") as f:
-    table2 = json.load(f)
+    r1 = json.load(f)
+table1 = r1["table1_accuracy"]
+per_cat = r1["table2_per_category_issue_area"]
 
-rows = []
-for clf_name, toks in table1.items():
-    for tok_name, m in toks.items():
-        rows.append((clf_name, tok_name, m["train_acc"], m["dev"]["accuracy"],
-                      m["dev"]["precision"], m["dev"]["recall"], m["dev"]["f1"]))
-
-md = ["| Classifier | Tokenization | Train Acc | Dev Acc | Dev Precision | Dev Recall | Dev F1 |",
-      "|---|---|---|---|---|---|---|"]
-for clf_name, tok_name, tr, acc, p, r, f1 in rows:
-    md.append(f"| {clf_name} | {tok_name} | {tr:.4f} | {acc:.4f} | {p:.4f} | {r:.4f} | {f1:.4f} |")
+md = ["### Table 1 — Phase 1 replication: accuracy by model & label granularity",
+      "| Model | Label task | Dev Acc | Dev Macro-F1 | Test Acc | Test Macro-F1 |",
+      "|---|---|---|---|---|---|"]
+for key, r in table1.items():
+    if key.endswith("issue_area"):
+        model, task = key[: -len("_issue_area")], "issue_area (15-label)"
+    else:
+        model, task = key[: -len("_issue")], "issue (fine-grained)"
+    md.append(
+        f"| {model} | {task} | {r['dev']['accuracy']:.4f} | {r['dev']['macro_f1']:.4f} | "
+        f"{r['test']['accuracy']:.4f} | {r['test']['macro_f1']:.4f} |"
+    )
 
 md.append("")
-md.append("### Table 2 — Best 2 models (by dev F1), test-set performance")
-md.append("| Model | Accuracy | Precision | Recall | F1 |")
-md.append("|---|---|---|---|---|")
-for key, m in table2.items():
-    md.append(f"| {key} | {m['accuracy']:.4f} | {m['precision']:.4f} | {m['recall']:.4f} | {m['f1']:.4f} |")
+md.append("### Table 2 — Per-category test performance on issue_area (15 classes)")
+for model_name, cats in per_cat.items():
+    md.append(f"\n**{model_name}**")
+    md.append("| Category | Precision | Recall | F1 | Support |")
+    md.append("|---|---|---|---|---|")
+    for cat, m in sorted(cats.items(), key=lambda kv: int(kv[0])):
+        md.append(f"| {cat} | {m['precision']:.2f} | {m['recall']:.2f} | {m['f1']:.2f} | {m['support']} |")
 
 try:
     with open("results/tuned_results.json") as f:
         tuned = json.load(f)
     md.append("")
-    md.append("### Phase 2 — Before/after tuning (dev-only selection, test touched once)")
-    md.append("| Classifier | Tokenization | Best Params | Dev F1 Before | Dev F1 After | Test F1 After |")
+    md.append("### Phase 2 — Before/after tuning (dev-selected, test touched once)")
+    md.append("| Model+Task | Extra Params | Best C | Dev Macro-F1 (after) | Test Acc (after) | Test Macro-F1 (after) |")
     md.append("|---|---|---|---|---|---|")
-    for clf_name, r in tuned.items():
-        params = ", ".join(f"{k}={v}" for k, v in r["best_params"].items())
+    for key, r in tuned.items():
+        extra = r.get("num_topics", r.get("vector_size"))
+        extra_label = "num_topics" if "num_topics" in r else "vector_size"
         md.append(
-            f"| {clf_name} | {r['tokenization']} | {params} | "
-            f"{r['dev_before']['f1']:.4f} | {r['dev_after']['f1']:.4f} | {r['test_after']['f1']:.4f} |"
+            f"| {key} | {extra_label}={extra} | {r['best_C']} | {r['dev_after_f1']:.4f} | "
+            f"{r['test_after']['accuracy']:.4f} | {r['test_after']['macro_f1']:.4f} |"
         )
 except FileNotFoundError:
-    pass
+    tuned = None
 
 with open("results/comparison_table.md", "w") as f:
     f.write("\n".join(md))
 print("Wrote results/comparison_table.md")
 
-# Bar chart: dev F1 by classifier (best tokenization per classifier)
-best_per_clf = {}
-for clf_name, tok_name, tr, acc, p, r, f1 in rows:
-    if clf_name not in best_per_clf or f1 > best_per_clf[clf_name][1]:
-        best_per_clf[clf_name] = (tok_name, f1)
-
-names = list(best_per_clf.keys())
-f1s = [best_per_clf[n][1] for n in names]
-labels = [f"{n}\n({best_per_clf[n][0]})" for n in names]
-
-plt.figure(figsize=(8, 5))
-plt.bar(labels, f1s, color="#4C72B0")
-plt.ylabel("Dev F1 (best tokenization)")
-plt.title("Best Dev F1 per Classifier — Paper Replication")
-plt.ylim(0, 1)
-for i, v in enumerate(f1s):
-    plt.text(i, v + 0.02, f"{v:.3f}", ha="center")
+# Bar chart: test accuracy by model x task (phase 1)
+labels, accs = [], []
+for key, r in table1.items():
+    labels.append(key)
+    accs.append(r["test"]["accuracy"])
+plt.figure(figsize=(9, 5))
+plt.bar(labels, accs, color="#4C72B0")
+plt.ylabel("Test Accuracy")
+plt.title("Phase 1: Test Accuracy by Model & Label Task")
+plt.xticks(rotation=30, ha="right")
+for i, v in enumerate(accs):
+    plt.text(i, v + 0.01, f"{v:.3f}", ha="center")
 plt.tight_layout()
-plt.savefig("results/figures/dev_f1_by_classifier.png", dpi=150)
-print("Wrote results/figures/dev_f1_by_classifier.png")
+plt.savefig("results/figures/phase1_test_accuracy.png", dpi=150)
+print("Wrote results/figures/phase1_test_accuracy.png")
 
-# Before/after tuning chart
-try:
-    with open("results/tuned_results.json") as f:
-        tuned = json.load(f)
+if tuned:
     names = list(tuned.keys())
-    before = [tuned[n]["dev_before"]["f1"] for n in names]
-    after = [tuned[n]["dev_after"]["f1"] for n in names]
+    before = [table1[n]["test"]["accuracy"] for n in names]
+    after = [tuned[n]["test_after"]["accuracy"] for n in names]
     x = range(len(names))
     width = 0.35
-    plt.figure(figsize=(8, 5))
-    plt.bar([i - width / 2 for i in x], before, width, label="Before tuning (paper defaults)", color="#999999")
-    plt.bar([i + width / 2 for i in x], after, width, label="After tuning (dev-selected)", color="#55A868")
-    plt.xticks(list(x), names, rotation=20, ha="right")
-    plt.ylabel("Dev F1")
+    plt.figure(figsize=(9, 5))
+    plt.bar([i - width / 2 for i in x], before, width, label="Phase 1 (default hyperparams)", color="#999999")
+    plt.bar([i + width / 2 for i in x], after, width, label="Phase 2 (tuned)", color="#55A868")
+    plt.xticks(list(x), names, rotation=30, ha="right")
+    plt.ylabel("Test Accuracy")
     plt.title("Phase 2: Before vs After Hyperparameter Tuning")
     plt.legend()
-    plt.ylim(0, 1)
     plt.tight_layout()
     plt.savefig("results/figures/before_after_tuning.png", dpi=150)
     print("Wrote results/figures/before_after_tuning.png")
-except FileNotFoundError:
-    pass

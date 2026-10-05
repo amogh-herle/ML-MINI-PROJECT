@@ -222,3 +222,6 @@ __marimo__/
 # local lock files
 .~lock*
 *.xlsx#
+
+# large dataset cache (auto-downloaded by run_all.py via textacy, ~107MB, exceeds GitHub's 100MB limit)
+data/

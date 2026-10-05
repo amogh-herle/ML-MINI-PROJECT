@@ -1,7 +1,5 @@
 scikit-learn
-jieba
-pandas
-pyarrow
 gensim
-tensorflow-cpu
+textacy
+pandas
 matplotlib

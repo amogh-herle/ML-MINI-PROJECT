@@ -1,73 +1,67 @@
-"""Preprocessing utilities, following the methodology of the reference paper
-(Bai, He & Yuan 2021 - "Sentiment Analysis of Chinese Microblog Posts on
-Attitude Towards Vaccination Since the Distribution of COVID-19 Vaccines in China").
+"""Load and preprocess the Supreme Court Database corpus (via textacy), matching
+the reference paper's "Classification of Legal Text" (Iyer, CS229 2020) dataset:
+~8,400 US Supreme Court opinions (1946-2016), each labelled with:
+  - issue_area: 15 broad human-curated categories (paper's "15-Labels")
+  - issue: fine-grained issue code, ~260-280 distinct values (paper's "279 Labels")
 
-Steps replicated from the paper:
-  1. Discard posts containing the bracket characters "【" / "】" (these are
-     mostly media/news reposts rather than opinion posts).
-  2. Strip Weibo emoticon tags like "[哈哈]" so labels aren't a trivial leak
-     (our substitute dataset derives its labels from these emoticons).
-  3. Tokenize with jieba (word segmentation), and also provide unigram/
-     bigram/trigram (character n-gram) tokenizers, matching the 4 tokenization
-     schemes compared in the paper.
-  4. Remove Chinese stopwords.
+Deviation from the paper: legal opinions run very long (median ~34k characters
+here); we truncate each opinion to its first MAX_CHARS characters before
+vectorization, for tractable LDA/Doc2Vec training time. This keeps the
+dominant vocabulary (most legal opinions state the issue and holding early)
+while staying within a reasonable compute budget.
 """
 import re
-import jieba
+import textacy.datasets
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
 
-EMOTICON_RE = re.compile(r"\[[^\[\]]{1,6}\]")
-BRACKET_CHARS = ("【", "】")
-URL_RE = re.compile(r"https?://\S+|http://t\.cn/\S+")
-MENTION_RE = re.compile(r"@[\w\-]+")
+MAX_CHARS = 4000
+SEED = 42
+DATA_DIR = "data/textacy_scotus"
 
-# Minimal Chinese stopword list (subset of stopwords-zh, the list used in the paper)
-STOPWORDS = set("""
-的 了 在 是 我 有 和 就 不 人 都 一 一个 上 也 很 到 说 要 去 你 会 着
-这 那 与 及 或 对 为 以 之 其 并 被 把 让 但 却 又 还 更 已 则 即
-吗 呢 吧 啊 哦 嗯 噢 哈 呀 啦 么 的话 这个 那个 他 她 它 们 我们 你们 他们
-""".split())
+WS_RE = re.compile(r"\s+")
 
 
-def basic_clean(text: str) -> str:
-    """Remove URLs, @mentions, and emoticon tags; drop posts containing brackets upstream."""
-    text = URL_RE.sub("", text)
-    text = MENTION_RE.sub("", text)
-    text = EMOTICON_RE.sub("", text)
-    text = text.replace("﻿", "").strip()
-    return text
+def clean_text(text: str) -> str:
+    text = WS_RE.sub(" ", text).strip()
+    return text[:MAX_CHARS]
 
 
-def has_media_brackets(text: str) -> bool:
-    return any(c in text for c in BRACKET_CHARS)
+def load_corpus(max_docs=None):
+    """Returns list of dicts: {text, issue_area, issue}. Drops records with
+    missing/unknown issue_area (-1) or missing issue code, matching the
+    paper's use of only human-curated-category records."""
+    ds = textacy.datasets.SupremeCourt(data_dir=DATA_DIR)
+    ds.download()  # no-op if already downloaded
+    records = []
+    for text, meta in ds.records(limit=max_docs):
+        issue_area = meta.get("issue_area")
+        issue = meta.get("issue")
+        if issue_area is None or issue_area == -1 or not issue:
+            continue
+        records.append({
+            "text": clean_text(text),
+            "issue_area": issue_area,
+            "issue": issue,
+        })
+    return records
 
 
-def tokenize_jieba(text: str):
-    return [w for w in jieba.lcut(text) if w.strip() and w not in STOPWORDS]
+def split_records(records, train_size=0.7, dev_size=0.15):
+    """70/15/15 train/dev/test split, stratified by issue_area (the coarser,
+    better-balanced label)."""
+    labels = [r["issue_area"] for r in records]
+    train, rest = train_test_split(
+        records, train_size=train_size, random_state=SEED, stratify=labels
+    )
+    rest_labels = [r["issue_area"] for r in rest]
+    dev_frac = dev_size / (1 - train_size)
+    dev, test = train_test_split(
+        rest, train_size=dev_frac, random_state=SEED, stratify=rest_labels
+    )
+    return train, dev, test
 
 
-def tokenize_unigram(text: str):
-    return [c for c in text if c.strip() and c not in STOPWORDS]
-
-
-def tokenize_ngram(text: str, n: int):
-    chars = [c for c in text if c.strip()]
-    if len(chars) < n:
-        return ["".join(chars)] if chars else []
-    return ["".join(chars[i:i + n]) for i in range(len(chars) - n + 1)]
-
-
-TOKENIZERS = {
-    "jieba": tokenize_jieba,
-    "unigram": tokenize_unigram,
-    "bigram": lambda t: tokenize_ngram(t, 2),
-    "trigram": lambda t: tokenize_ngram(t, 3),
-}
-
-
-def preprocess_dataframe(df, text_col="review", label_col="label"):
-    """Apply paper's filtering: drop bracketed/media posts, clean emoticons/urls."""
-    df = df.copy()
-    df = df[~df[text_col].apply(has_media_brackets)]
-    df[text_col] = df[text_col].apply(basic_clean)
-    df = df[df[text_col].str.len() > 0]
-    return df.reset_index(drop=True)
+def simple_tokenize(text: str):
+    toks = re.findall(r"[a-zA-Z]{2,}", text.lower())
+    return [t for t in toks if t not in ENGLISH_STOP_WORDS]
