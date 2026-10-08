@@ -1,0 +1,16 @@
+{
+  "v": 4,
+  "createdOnFiles": {"v": 1, "at": "2026-10-08T00:00:00Z"},
+  "lists": "css",
+  "title": "Classification of Legal Text",
+  "order": ["cover", "problem", "dataset", "approach", "phase1", "phase2", "phase3", "insights", "conclusions"],
+  "sections": {
+    "s1": {"description": "Overview", "start": "cover"},
+    "s2": {"description": "Methods", "start": "dataset"},
+    "s3": {"description": "Results", "start": "phase1"},
+    "s4": {"description": "Conclusions", "start": "conclusions"}
+  },
+  "faces": {
+    "public-sans": {"family": "Public Sans", "href": "https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap"}
+  }
+}

@@ -1,0 +1,18 @@
+<section id="approach" data-transition="fade" style="background:#FBFBF8;color:#1A1A1A;font-family:'Public Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<p style="font-size:24px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#2A5CAA">Approach</p>
+<h2 style="font-size:56px;font-weight:700;line-height:1.1">Two ways to featurize legal text, one classifier</h2>
+<div style="display:flex;gap:32px;flex:1">
+<div style="flex:1;background:#FFFFFF;border:1px solid #E3E6E4;border-radius:16px;padding:40px;display:flex;flex-direction:column;gap:16px">
+<h3 style="font-size:36px;font-weight:700;color:#2A5CAA">LDA + Logistic Regression</h3>
+<p style="font-size:26px;color:#4A5568;line-height:1.5">Finds abstract recurring topics across all rulings (gensim, TF-IDF). Each ruling becomes a mix-of-topics score. A classifier maps topic mix → category.</p>
+<p style="font-size:24px;color:#6A7179">Tuned: 100 topics (vs. 50 default)</p>
+</div>
+<div style="flex:1;background:#FFFFFF;border:1px solid #E3E6E4;border-radius:16px;padding:40px;display:flex;flex-direction:column;gap:16px">
+<h3 style="font-size:36px;font-weight:700;color:#2A5CAA">Doc2Vec + Logistic Regression</h3>
+<p style="font-size:26px;color:#4A5568;line-height:1.5">Learns a dense numeric "fingerprint" per ruling by predicting words in context (gensim Doc2Vec). Same classifier maps fingerprint → category.</p>
+<p style="font-size:24px;color:#6A7179">Tuned: 50-dim vectors (vs. 100 default)</p>
+</div>
+</div>
+<p style="font-size:24px;color:#6A7179">A third method (BERT) was in the original paper, but it ran out of memory there — no baseline to replicate.</p>
+<p style="position:absolute;left:128px;bottom:64px;font-size:24px;color:#6A7179">3 / 7</p>
+</section>
