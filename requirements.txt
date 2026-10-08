@@ -4,3 +4,4 @@ textacy
 pandas
 matplotlib
 reportlab
+python-pptx
