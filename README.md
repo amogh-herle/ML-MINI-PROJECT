@@ -11,7 +11,7 @@ at two granularities:
 - **issue_area** — 15 broad human-curated categories (e.g. Criminal
   Procedure, Civil Rights, First Amendment).
 - **issue** — ~260-280 fine-grained issue codes.
-
+   
 Legal opinions use long, non-standard sentence structures that break typical
 NLP tooling; the paper explores whether topic-model and embedding features,
 fed into a simple classifier, can still recover the human-expert categories.
