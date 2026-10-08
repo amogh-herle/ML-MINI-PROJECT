@@ -49,3 +49,24 @@
 | lda_lr_issue | num_topics=100 | 10.0 | 0.0840 | 0.1988 | 0.0843 |
 | doc2vec_lr_issue_area | vector_size=50 | 1.0 | 0.5220 | 0.6224 | 0.4769 |
 | doc2vec_lr_issue | vector_size=50 | 0.1 | 0.3125 | 0.4202 | 0.2888 |
+
+### Phase 3 — Classifier comparison (same tuned features, different classifier on top)
+Features held fixed at Phase 2's winning settings (LDA num_topics=100, Doc2Vec vector_size=50). Logistic Regression rows repeated from Phase 2 for reference.
+| Classifier | Feature | Label task | Test Acc | Test Macro-F1 |
+|---|---|---|---|---|
+| logistic_regression | lda | issue_area | 0.4871 | 0.2674 |
+| logistic_regression | lda | issue | 0.1988 | 0.0843 |
+| logistic_regression | doc2vec | issue_area | 0.6224 | 0.4769 |
+| logistic_regression | doc2vec | issue | 0.4202 | 0.2888 |
+| svm | doc2vec | issue_area | 0.6884 | 0.4993 |
+| random_forest | doc2vec | issue_area | 0.5957 | 0.3171 |
+| naive_bayes | doc2vec | issue_area | 0.5873 | 0.4620 |
+| svm | lda | issue_area | 0.4912 | 0.2655 |
+| random_forest | lda | issue_area | 0.4612 | 0.2526 |
+| svm | doc2vec | issue | 0.4311 | 0.2647 |
+| naive_bayes | doc2vec | issue | 0.3709 | 0.2522 |
+| random_forest | doc2vec | issue | 0.3400 | 0.1730 |
+| random_forest | lda | issue | 0.2114 | 0.1292 |
+| svm | lda | issue | 0.1855 | 0.0803 |
+| naive_bayes | lda | issue_area | 0.1312 | 0.1369 |
+| naive_bayes | lda | issue | 0.0744 | 0.0746 |

@@ -163,12 +163,58 @@ separate 15+ categories. Doc2Vec actually preferred a *smaller* embedding
 overfits before the classifier sees enough signal, so halving it to 50
 improved both tasks (issue_area +3.1pp, fine-grained issue +4.9pp).
 
+### Phase 3 — Classifier comparison (beyond the paper: SVM, Random Forest, Naive Bayes)
+
+The paper only tries Logistic Regression on top of its two feature extractors.
+We additionally compare **SVM** (margin-based, RBF kernel), **Random Forest**
+(ensemble of decision trees), and **Naive Bayes** (Gaussian, Bayes' theorem)
+on the exact same feature vectors (LDA at `num_topics=100`, Doc2Vec at
+`vector_size=50` — Phase 2's winning settings) — isolating the effect of
+classifier choice from feature extraction.
+
+| Classifier | Feature | Label task | Test Acc | Test Macro-F1 |
+|---|---|---|---|---|
+| logistic_regression | doc2vec | issue_area | 0.6224 | 0.4769 |
+| **svm** | **doc2vec** | **issue_area** | **0.6884** | **0.4993** |
+| random_forest | doc2vec | issue_area | 0.5957 | 0.3171 |
+| naive_bayes | doc2vec | issue_area | 0.5873 | 0.4620 |
+| logistic_regression | lda | issue_area | 0.4871 | 0.2674 |
+| svm | lda | issue_area | 0.4912 | 0.2655 |
+| random_forest | lda | issue_area | 0.4612 | 0.2526 |
+| naive_bayes | lda | issue_area | 0.1312 | 0.1369 |
+| svm | doc2vec | issue | 0.4311 | 0.2647 |
+| logistic_regression | doc2vec | issue | 0.4202 | 0.2888 |
+| naive_bayes | doc2vec | issue | 0.3709 | 0.2522 |
+| random_forest | doc2vec | issue | 0.3400 | 0.1730 |
+| random_forest | lda | issue | 0.2114 | 0.1292 |
+| svm | lda | issue | 0.1855 | 0.0803 |
+| naive_bayes | lda | issue | 0.0744 | 0.0746 |
+
+Full JSON: [`results/classifier_comparison.json`](results/classifier_comparison.json).
+
+![Classifier comparison](results/figures/classifier_comparison.png)
+
+**Summary: SVM is the new overall best model** — SVM + Doc2Vec on
+`issue_area` reaches **68.8% test accuracy**, beating Logistic Regression's
+62.2% on the same features (+6.6pp), because the RBF kernel can draw a
+non-linear boundary through the 50-dimensional embedding space where LR's
+linear boundary can't. Random Forest and Naive Bayes both underperform
+Logistic Regression on Doc2Vec features — Random Forest likely because
+decision-tree splits don't exploit the smooth, dense structure of a learned
+embedding well, and Gaussian Naive Bayes because its independence assumption
+between the 50 embedding dimensions doesn't hold (they're highly
+correlated by construction). On LDA features, Naive Bayes collapses
+especially badly (13% accuracy, near chance) — its per-feature Gaussian
+assumption fits topic-probability vectors (which are small positive numbers
+summing to ~1, not normally distributed) poorly.
+
 ## Setup & running
 
 ```bash
 pip install -r requirements.txt
 python run_all.py                    # Phase 1: downloads corpus (~111MB, cached after first run), replicates both experiments
 python tune_all.py                   # Phase 2: dev-only hyperparameter tuning (slow: several LDA/Doc2Vec refits)
+python compare_classifiers.py        # Phase 3: SVM / Random Forest / Naive Bayes on the tuned feature settings
 python src/make_report_assets.py     # builds comparison_table.md + charts from the results
 ```
 
@@ -184,6 +230,10 @@ python src/make_report_assets.py     # builds comparison_table.md + charts from 
   (Criminal Procedure, Economic Activity) and failing on rare categories,
   matching the paper's own observation that large document collections
   "do not necessarily lead to better results" for some categories.
+- Beyond the paper's own Logistic Regression, **SVM is the strongest
+  classifier we found** — 68.8% test accuracy on Doc2Vec+issue_area, a
+  clear improvement over every other classifier/feature combination tried.
+  Classifier choice mattered almost as much as feature extraction here.
 - We did not replicate BERT: the paper's own attempt failed on memory
   limits, so there is no baseline number to reproduce. Future work could
   revisit this with a long-document Transformer variant (Longformer,
@@ -195,10 +245,13 @@ python src/make_report_assets.py     # builds comparison_table.md + charts from 
 src/preprocessing.py       - corpus loading (textacy), cleaning, tokenizing, train/dev/test split
 src/lda_lr.py              - LDA topic-distribution featurizer + Logistic Regression (Experiment 1)
 src/doc2vec_lr.py          - Doc2Vec paragraph-embedding featurizer + Logistic Regression (Experiment 2)
+src/classifiers.py         - SVM, Random Forest, Naive Bayes (beyond the paper's own LR)
 src/make_report_assets.py  - builds comparison table + charts from results
+src/make_writeup_pdf.py    - builds report/writeup.pdf from the results JSON files
 run_all.py                 - Phase 1 pipeline: load -> featurize -> train/eval both experiments, both label tasks
 tune_all.py                - Phase 2 pipeline: dev-only hyperparameter tuning per feature extractor + classifier
+compare_classifiers.py     - Phase 3 pipeline: SVM/Random Forest/Naive Bayes on the tuned feature settings
 data/                      - cached textacy SupremeCourt corpus (downloaded on first run)
-results/                   - table1.json, tuned_results.json, comparison_table.md, figures/
-report/                    - reference paper, guidelines, write-up
+results/                   - table1.json, tuned_results.json, classifier_comparison.json, comparison_table.md, figures/
+report/                    - reference paper, write-up PDF
 ```

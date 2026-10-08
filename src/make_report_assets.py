@@ -85,3 +85,53 @@ if tuned:
     plt.tight_layout()
     plt.savefig("results/figures/before_after_tuning.png", dpi=150)
     print("Wrote results/figures/before_after_tuning.png")
+
+# ---------------- Phase 3: classifier comparison (SVM / Random Forest / Naive Bayes) ----------------
+try:
+    with open("results/classifier_comparison.json") as f:
+        cc = json.load(f)
+    md.append("")
+    md.append("### Phase 3 — Classifier comparison (same tuned features, different classifier on top)")
+    md.append("Features held fixed at Phase 2's winning settings (LDA num_topics=100, "
+               "Doc2Vec vector_size=50). Logistic Regression rows repeated from Phase 2 for reference.")
+    md.append("| Classifier | Feature | Label task | Test Acc | Test Macro-F1 |")
+    md.append("|---|---|---|---|---|")
+    # include Logistic Regression rows for direct comparison
+    for key, r in tuned.items():
+        feat = "lda" if key.startswith("lda") else "doc2vec"
+        task = "issue_area" if key.endswith("issue_area") else "issue"
+        md.append(f"| logistic_regression | {feat} | {task} | {r['test_after']['accuracy']:.4f} | {r['test_after']['macro_f1']:.4f} |")
+    for key, r in sorted(cc.items(), key=lambda kv: -kv[1]["test"]["accuracy"]):
+        md.append(f"| {r['classifier']} | {r['feature']} | {r['label_task']} | {r['test']['accuracy']:.4f} | {r['test']['macro_f1']:.4f} |")
+
+    with open("results/comparison_table.md", "w") as f:
+        f.write("\n".join(md))
+    print("Wrote results/comparison_table.md (with Phase 3)")
+
+    # chart: best classifier per (feature, task) combo, grouped
+    combos = sorted(set((r["feature"], r["label_task"]) for r in cc.values()))
+    clf_names = ["logistic_regression", "svm", "random_forest", "naive_bayes"]
+    colors_map = {"logistic_regression": "#4C72B0", "svm": "#C44E52", "random_forest": "#55A868", "naive_bayes": "#8172B2"}
+    x = range(len(combos))
+    width = 0.2
+    plt.figure(figsize=(10, 5.5))
+    for i, clf_name in enumerate(clf_names):
+        vals = []
+        for feat, task in combos:
+            if clf_name == "logistic_regression":
+                tkey = f"{feat}_lr_{task}"  # tuned.json naming: lda_lr_issue_area / doc2vec_lr_issue
+                vals.append(tuned[tkey]["test_after"]["accuracy"])
+            else:
+                key = f"{clf_name}_{feat}_{task}"
+                vals.append(cc[key]["test"]["accuracy"])
+        offsets = [xi + (i - 1.5) * width for xi in x]
+        plt.bar(offsets, vals, width, label=clf_name, color=colors_map[clf_name])
+    plt.xticks(list(x), [f"{f}\n{t}" for f, t in combos])
+    plt.ylabel("Test Accuracy")
+    plt.title("Phase 3: Classifier Comparison (fixed tuned features)")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig("results/figures/classifier_comparison.png", dpi=150)
+    print("Wrote results/figures/classifier_comparison.png")
+except FileNotFoundError:
+    pass

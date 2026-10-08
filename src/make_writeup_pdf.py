@@ -17,6 +17,8 @@ with open("results/table1.json") as f:
     t1 = json.load(f)["table1_accuracy"]
 with open("results/tuned_results.json") as f:
     t2 = json.load(f)
+with open("results/classifier_comparison.json") as f:
+    t3 = json.load(f)
 
 styles = getSampleStyleSheet()
 styles.add(ParagraphStyle(name="TitleCustom", parent=styles["Title"], fontSize=16, spaceAfter=2))
@@ -53,13 +55,12 @@ story.append(Paragraph("Dataset", styles["H2"]))
 story.append(Paragraph(
     "We use the exact dataset the original paper used: the Supreme Court Database (Washington "
     "University) via the <b>textacy</b> package's bundled <b>SupremeCourt</b> dataset — 8,419 "
-    "opinions issued between 1946 and 2016, each with an expert-assigned issue_area and issue code. "
-    "No substitute dataset was needed. After dropping opinions with no issue_area label and issue "
-    "codes with fewer than 10 examples (so every class can appear in train/dev/test), 7,971 opinions "
-    "remain, split 70% / 15% / 15% into train / dev / test, stratified by issue_area. Because opinions "
-    "run very long (median ~34,000 characters), each is truncated to its first 4,000 characters before "
-    "vectorization, to keep LDA/Doc2Vec training times tractable — most opinions state the issue "
-    "and holding early, so this preserves the dominant vocabulary.", styles["Body"]))
+    "opinions (1946-2016), each with an expert-assigned issue_area and issue code. No substitute "
+    "was needed. After dropping opinions with no issue_area label and issue codes with fewer than "
+    "10 examples (so every class can appear in train/dev/test), 7,971 opinions remain, split "
+    "70%/15%/15% into train/dev/test, stratified by issue_area. Opinions run long (median ~34,000 "
+    "characters); each is truncated to its first 4,000 characters before vectorization, keeping "
+    "LDA/Doc2Vec training tractable.", styles["Body"]))
 
 story.append(Paragraph("Approach", styles["H2"]))
 story.append(Paragraph(
@@ -82,12 +83,13 @@ story.append(Paragraph(
 
 story.append(Paragraph("Implementation", styles["H2"]))
 story.append(Paragraph(
-    "Code is organized as <font face='Courier'>src/preprocessing.py</font> (corpus loading, cleaning, "
-    "tokenization, splitting), <font face='Courier'>src/lda_lr.py</font> and "
-    "<font face='Courier'>src/doc2vec_lr.py</font> (the two feature extractor + classifier pipelines), "
-    "<font face='Courier'>run_all.py</font> (Phase 1) and <font face='Courier'>tune_all.py</font> "
-    "(Phase 2). All hyperparameter selection uses only the dev split; the test split is evaluated "
-    "once per final configuration, keeping the comparison honest.", styles["Body"]))
+    "Code: <font face='Courier'>src/preprocessing.py</font> (loading/cleaning/splitting), "
+    "<font face='Courier'>src/lda_lr.py</font> / <font face='Courier'>src/doc2vec_lr.py</font> "
+    "(feature extractors), <font face='Courier'>src/classifiers.py</font> (SVM/Random Forest/Naive "
+    "Bayes), <font face='Courier'>run_all.py</font> / <font face='Courier'>tune_all.py</font> / "
+    "<font face='Courier'>compare_classifiers.py</font> (Phases 1/2/3). All hyperparameter and "
+    "classifier selection uses only the dev split; test is evaluated once per final configuration.",
+    styles["Body"]))
 
 def pct(x):
     return f"{x*100:.1f}%"
@@ -135,26 +137,60 @@ tbl2.setStyle(TableStyle([
 story.append(tbl2)
 
 story.append(Paragraph(
-    "Tuning gave clear gains throughout: LDA benefited from more topics (50→100; issue_area "
-    "test accuracy +9.4 points) — 50 topics was too coarse to separate 15+ categories. Doc2Vec "
-    "preferred a <i>smaller</i> embedding (100→50); with ~5,600 training documents, 200 "
-    "dimensions overfits before the classifier sees enough signal.", styles["Body"]))
+    "LDA benefited from more topics (50→100; issue_area test accuracy +9.4pp) — 50 was too coarse "
+    "for 15+ categories. Doc2Vec preferred a <i>smaller</i> embedding (100→50): with ~5,600 "
+    "training documents, 200 dimensions overfits before the classifier sees enough signal.",
+    styles["Body"]))
+
+story.append(Paragraph("Results — Phase 3: classifier comparison (beyond the paper)", styles["H2"]))
+story.append(Paragraph(
+    "The paper only tries Logistic Regression. We additionally compare <b>SVM</b> (RBF kernel), "
+    "<b>Random Forest</b>, and <b>Naive Bayes (Gaussian)</b> on the identical Phase-2-tuned feature "
+    "vectors, isolating classifier choice from feature extraction, on the issue_area task:",
+    styles["Body"]))
+
+t3_data = [["Classifier", "Feature", "Test Acc", "Test Macro-F1"]]
+for key, r in sorted(t3.items(), key=lambda kv: -kv[1]["test"]["accuracy"]):
+    if r["label_task"] != "issue_area":
+        continue
+    t3_data.append([r["classifier"], r["feature"], pct(r["test"]["accuracy"]), f"{r['test']['macro_f1']:.3f}"])
+# prepend LR rows from tuned_results for direct comparison
+lr_rows = [["logistic_regression", feat, pct(t2[f"{feat}_lr_issue_area"]["test_after"]["accuracy"]),
+            f"{t2[f'{feat}_lr_issue_area']['test_after']['macro_f1']:.3f}"] for feat in ["lda", "doc2vec"]]
+t3_data = [t3_data[0]] + sorted(t3_data[1:] + lr_rows, key=lambda row: -float(row[2].rstrip('%')))
+tbl3 = Table(t3_data, colWidths=[1.6*inch, 1.2*inch, 1.1*inch, 1.3*inch])
+tbl3.setStyle(TableStyle([
+    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2c3e50")),
+    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+    ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+    ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f2f2f2")]),
+    ("ALIGN", (2, 0), (-1, -1), "CENTER"),
+    ("TOPPADDING", (0, 0), (-1, -1), 3),
+    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+]))
+story.append(tbl3)
+story.append(Paragraph(
+    "<b>SVM is the overall best model</b>: 68.8% test accuracy on Doc2Vec+issue_area, beating "
+    "Logistic Regression's 62.2% on the same features (+6.6pp) — the RBF kernel draws a non-linear "
+    "boundary LR's linear one can't. Random Forest and Naive Bayes both underperform LR on Doc2Vec; "
+    "Naive Bayes also collapses on LDA features (13% accuracy), since its per-feature Gaussian "
+    "assumption fits topic-probability vectors poorly.", styles["Body"]))
 
 story.append(Paragraph("Conclusions", styles["H2"]))
 story.append(Paragraph(
-    "Doc2Vec embeddings consistently outperform LDA topic-distribution features for this task "
-    "(e.g. 62.2% vs 48.7% test accuracy on issue_area after tuning), and the coarser 15-category "
-    "task is much easier than the 260+-category fine-grained task — unsurprising given how thin "
-    "per-class training data gets at that granularity. LDA's macro-F1 trails its accuracy badly "
-    "(0.267 vs 48.7% on issue_area), indicating it defaults to majority classes (Criminal Procedure, "
-    "Economic Activity) and fails on rare ones; Doc2Vec generalizes far better to minority categories "
-    "such as Privacy and Attorneys. Our replicated numbers land in the same range and follow the "
-    "same ordering as the original paper's reported results. We note an internal inconsistency in "
-    "the paper's own results table (its printed table and its prose text disagree on which label "
-    "granularity scored higher) and resolve it in favor of the prose. We did not replicate the "
-    "paper's BERT experiment, since it failed with an out-of-memory error in the original work and "
-    "left no baseline number to reproduce; a long-document Transformer variant (e.g. Longformer) is "
-    "natural future work, as the original paper itself suggests.", styles["Body"]))
+    "Doc2Vec embeddings consistently outperform LDA topic-distribution features, and the coarser "
+    "15-category task is much easier than the 260+-category fine-grained task — unsurprising given "
+    "how thin per-class training data gets at that granularity. LDA's macro-F1 trails its accuracy "
+    "badly (0.267 vs 48.7% on issue_area), defaulting to majority classes (Criminal Procedure, "
+    "Economic Activity) and failing on rare ones; Doc2Vec generalizes far better to minority "
+    "categories such as Privacy and Attorneys. Classifier choice mattered almost as much as feature "
+    "extraction: SVM beat every other classifier tried. Our replicated numbers land in the same "
+    "range and order as the original paper's. We note an internal inconsistency in the paper's own "
+    "results table (its printed table and prose disagree on which label granularity scored higher) "
+    "and resolve it in favor of the prose. We did not replicate BERT: the paper's own attempt failed "
+    "with an out-of-memory error and left no baseline to reproduce; a long-document Transformer "
+    "(e.g. Longformer) is natural future work, as the paper itself suggests.", styles["Body"]))
 
 story.append(Spacer(1, 6))
 story.append(Paragraph(
