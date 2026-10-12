@@ -5,6 +5,29 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+# Match the deck's color palette so charts drop straight into the slides/write-up
+NAVY = "#142340"
+ACCENT = "#2A5CAA"
+GREEN = "#1E7A3D"
+GREY = "#8A8F98"
+RED = "#B3261E"
+PURPLE = "#6B4FA0"
+BG = "#FBFBF8"
+TEXT = "#1A1A1A"
+
+plt.rcParams.update({
+    "font.family": "sans-serif",
+    "font.sans-serif": ["DejaVu Sans", "Arial"],
+    "axes.edgecolor": "#D7DAD8",
+    "axes.labelcolor": TEXT,
+    "text.color": TEXT,
+    "xtick.color": TEXT,
+    "ytick.color": TEXT,
+    "figure.facecolor": BG,
+    "axes.facecolor": BG,
+    "savefig.facecolor": BG,
+})
+
 with open("results/table1.json") as f:
     r1 = json.load(f)
 table1 = r1["table1_accuracy"]
@@ -58,13 +81,15 @@ labels, accs = [], []
 for key, r in table1.items():
     labels.append(key)
     accs.append(r["test"]["accuracy"])
-plt.figure(figsize=(9, 5))
-plt.bar(labels, accs, color="#4C72B0")
-plt.ylabel("Test Accuracy")
-plt.title("Phase 1: Test Accuracy by Model & Label Task")
-plt.xticks(rotation=30, ha="right")
+fig, ax = plt.subplots(figsize=(9, 5))
+bars = ax.bar(labels, accs, color=ACCENT, width=0.6)
+ax.set_ylabel("Test Accuracy")
+ax.set_title("Phase 1: Test Accuracy by Model & Label Task", fontweight="bold", color=NAVY)
+ax.spines[["top", "right"]].set_visible(False)
+ax.set_ylim(0, max(accs) * 1.25)
+plt.xticks(rotation=20, ha="right")
 for i, v in enumerate(accs):
-    plt.text(i, v + 0.01, f"{v:.3f}", ha="center")
+    plt.text(i, v + 0.012, f"{v:.1%}", ha="center", fontweight="bold", color=NAVY)
 plt.tight_layout()
 plt.savefig("results/figures/phase1_test_accuracy.png", dpi=150)
 print("Wrote results/figures/phase1_test_accuracy.png")
@@ -75,13 +100,18 @@ if tuned:
     after = [tuned[n]["test_after"]["accuracy"] for n in names]
     x = range(len(names))
     width = 0.35
-    plt.figure(figsize=(9, 5))
-    plt.bar([i - width / 2 for i in x], before, width, label="Phase 1 (default hyperparams)", color="#999999")
-    plt.bar([i + width / 2 for i in x], after, width, label="Phase 2 (tuned)", color="#55A868")
-    plt.xticks(list(x), names, rotation=30, ha="right")
+    fig, ax = plt.subplots(figsize=(9, 5))
+    b1 = ax.bar([i - width / 2 for i in x], before, width, label="Phase 1 (default)", color=GREY)
+    b2 = ax.bar([i + width / 2 for i in x], after, width, label="Phase 2 (tuned)", color=GREEN)
+    ax.spines[["top", "right"]].set_visible(False)
+    plt.xticks(list(x), names, rotation=20, ha="right")
+    for bars in (b1, b2):
+        for bar in bars:
+            h = bar.get_height()
+            plt.text(bar.get_x() + bar.get_width() / 2, h + 0.01, f"{h:.0%}", ha="center", fontsize=9)
     plt.ylabel("Test Accuracy")
-    plt.title("Phase 2: Before vs After Hyperparameter Tuning")
-    plt.legend()
+    plt.title("Phase 2: Before vs After Hyperparameter Tuning", fontweight="bold", color=NAVY)
+    plt.legend(frameon=False)
     plt.tight_layout()
     plt.savefig("results/figures/before_after_tuning.png", dpi=150)
     print("Wrote results/figures/before_after_tuning.png")
@@ -111,10 +141,10 @@ try:
     # chart: best classifier per (feature, task) combo, grouped
     combos = sorted(set((r["feature"], r["label_task"]) for r in cc.values()))
     clf_names = ["logistic_regression", "svm", "random_forest", "naive_bayes"]
-    colors_map = {"logistic_regression": "#4C72B0", "svm": "#C44E52", "random_forest": "#55A868", "naive_bayes": "#8172B2"}
+    colors_map = {"logistic_regression": ACCENT, "svm": GREEN, "random_forest": PURPLE, "naive_bayes": GREY}
     x = range(len(combos))
     width = 0.2
-    plt.figure(figsize=(10, 5.5))
+    fig, ax = plt.subplots(figsize=(10, 5.5))
     for i, clf_name in enumerate(clf_names):
         vals = []
         for feat, task in combos:
@@ -125,11 +155,12 @@ try:
                 key = f"{clf_name}_{feat}_{task}"
                 vals.append(cc[key]["test"]["accuracy"])
         offsets = [xi + (i - 1.5) * width for xi in x]
-        plt.bar(offsets, vals, width, label=clf_name, color=colors_map[clf_name])
+        bars = ax.bar(offsets, vals, width, label=clf_name.replace("_", " ").title(), color=colors_map[clf_name])
+    ax.spines[["top", "right"]].set_visible(False)
     plt.xticks(list(x), [f"{f}\n{t}" for f, t in combos])
     plt.ylabel("Test Accuracy")
-    plt.title("Phase 3: Classifier Comparison (fixed tuned features)")
-    plt.legend()
+    plt.title("Phase 3: Classifier Comparison (fixed tuned features)", fontweight="bold", color=NAVY)
+    plt.legend(frameon=False, ncol=4, loc="upper center", bbox_to_anchor=(0.5, -0.12))
     plt.tight_layout()
     plt.savefig("results/figures/classifier_comparison.png", dpi=150)
     print("Wrote results/figures/classifier_comparison.png")
