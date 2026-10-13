@@ -167,7 +167,7 @@ improved both tasks (issue_area +3.1pp, fine-grained issue +4.9pp).
 
 The paper only tries Logistic Regression on top of its two feature extractors.
 We additionally compare **SVM** (margin-based, RBF kernel), **Random Forest**
-(ensemble of decision trees), and **Naive Bayes** (Gaussian, Bayes' theorem)
+(ensemble of decision trees), and **Gaussian Naive Bayes** (Bayes' theorem)
 on the exact same feature vectors (LDA at `num_topics=100`, Doc2Vec at
 `vector_size=50` — Phase 2's winning settings) — isolating the effect of
 classifier choice from feature extraction.
@@ -190,6 +190,11 @@ classifier choice from feature extraction.
 | svm | lda | issue | 0.1855 | 0.0803 |
 | naive_bayes | lda | issue | 0.0744 | 0.0746 |
 
+Note: SVM, Random Forest and Gaussian Naive Bayes were run with default
+hyperparameters and not tuned on dev, unlike Logistic Regression's `C`. All
+results are single-seed, single-split (test set about 1,200 opinions), so gaps
+under about 1 percentage point are not reliable.
+
 Full JSON: [`results/classifier_comparison.json`](results/classifier_comparison.json).
 
 ![Classifier comparison](results/figures/classifier_comparison.png)
@@ -198,12 +203,12 @@ Full JSON: [`results/classifier_comparison.json`](results/classifier_comparison.
 `issue_area` reaches **68.8% test accuracy**, beating Logistic Regression's
 62.2% on the same features (+6.6pp), because the RBF kernel can draw a
 non-linear boundary through the 50-dimensional embedding space where LR's
-linear boundary can't. Random Forest and Naive Bayes both underperform
+linear boundary can't. Random Forest and Gaussian Naive Bayes both underperform
 Logistic Regression on Doc2Vec features — Random Forest likely because
 decision-tree splits don't exploit the smooth, dense structure of a learned
 embedding well, and Gaussian Naive Bayes because its independence assumption
 between the 50 embedding dimensions doesn't hold (they're highly
-correlated by construction). On LDA features, Naive Bayes collapses
+correlated by construction). On LDA features, Gaussian Naive Bayes collapses
 especially badly (13% accuracy, near chance) — its per-feature Gaussian
 assumption fits topic-probability vectors (which are small positive numbers
 summing to ~1, not normally distributed) poorly.

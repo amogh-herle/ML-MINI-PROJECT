@@ -299,19 +299,22 @@ s = add_slide(LIGHT_BG)
 add_eyebrow(s, "Phase 3 — Beyond the Paper")
 add_text(s, 0.9, 0.95, 11.5, 0.6, "Same features, different classifier on top", size=26, color=TEXT_DARK, bold=True)
 add_text(s, 0.9, 1.55, 5.4, 0.9,
-         "The paper only tries Logistic Regression. We also tried SVM, Random Forest, and Naive Bayes "
+         "The paper only tries Logistic Regression. We also tried SVM, Random Forest, and Gaussian Naive Bayes "
          "— same Doc2Vec fingerprints, issue_area task.", size=14, color=TEXT_MUTED, line_spacing=1.3)
 lr_doc2vec = T2["doc2vec_lr_issue_area"]["test_after"]
 area_rows = sorted(
     [r for r in T3.values() if r["label_task"] == "issue_area" and r["feature"] == "doc2vec"],
     key=lambda r: -r["test"]["accuracy"],
 )
-names = {"svm": "SVM (RBF)", "random_forest": "Random Forest", "naive_bayes": "Naive Bayes"}
+names = {"svm": "SVM (RBF)", "random_forest": "Random Forest", "naive_bayes": "Gaussian Naive Bayes"}
 rows = [[names[r["classifier"]], pct(r["test"]["accuracy"]), f"{r['test']['macro_f1']:.3f}"] for r in area_rows]
 rows.insert(1, ["Logistic Regression", pct(lr_doc2vec["accuracy"]), f"{lr_doc2vec['macro_f1']:.3f}"])
 header = ["Classifier", "Test Acc", "F1"]
 add_table(s, 0.9, 2.6, 5.4, 2.3, header, rows, highlight_row=0, col_widths=[2.6, 1.4, 1.4])
-add_text(s, 0.9, 5.2, 5.4, 1.3,
+add_text(s, 0.9, 4.95, 5.4, 0.6,
+         "SVM (RBF, C=1.0), Random Forest (200 trees) and Naive Bayes use defaults, untuned; "
+         "LR (C=1.0) is the tuned one.", size=11, color=TEXT_GREY, line_spacing=1.2)
+add_text(s, 0.9, 5.6, 5.4, 1.1,
          "SVM wins — its RBF kernel draws a curved decision boundary through the embedding "
          "space that straight-line Logistic Regression can't match.", size=14, color=TEXT_MUTED, line_spacing=1.3)
 s.shapes.add_picture("results/figures/classifier_comparison.png", Inches(6.6), Inches(1.75), width=Inches(5.9))
@@ -344,7 +347,7 @@ bullets = [
     "Doc2Vec embeddings consistently beat LDA topic features on this task",
     "Coarse 15-category task is much easier than the 260+-category one",
     "Tuning hyperparameters gave real gains everywhere (not just marginal)",
-    "SVM beat every classifier tried — classifier choice mattered almost as much as features",
+    "SVM beat every classifier on Doc2Vec issue_area (on LDA ~level with LR: 49.1 vs 48.7%)",
     "Our numbers land in the same range and order as the original paper's",
     "BERT not replicated — paper's own attempt ran out of memory, no baseline to match",
 ]

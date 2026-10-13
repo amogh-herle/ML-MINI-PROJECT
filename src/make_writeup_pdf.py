@@ -145,7 +145,7 @@ story.append(Paragraph(
 story.append(Paragraph("Results — Phase 3: classifier comparison (beyond the paper)", styles["H2"]))
 story.append(Paragraph(
     "The paper only tries Logistic Regression. We additionally compare <b>SVM</b> (RBF kernel), "
-    "<b>Random Forest</b>, and <b>Naive Bayes (Gaussian)</b> on the identical Phase-2-tuned feature "
+    "<b>Random Forest</b>, and <b>Gaussian Naive Bayes</b> on the identical Phase-2-tuned feature "
     "vectors, isolating classifier choice from feature extraction, on the issue_area task:",
     styles["Body"]))
 
@@ -173,9 +173,11 @@ story.append(tbl3)
 story.append(Paragraph(
     "<b>SVM is the overall best model</b>: 68.8% test accuracy on Doc2Vec+issue_area, beating "
     "Logistic Regression's 62.2% on the same features (+6.6pp) — the RBF kernel draws a non-linear "
-    "boundary LR's linear one can't. Random Forest and Naive Bayes both underperform LR on Doc2Vec; "
-    "Naive Bayes also collapses on LDA features (13% accuracy), since its per-feature Gaussian "
-    "assumption fits topic-probability vectors poorly.", styles["Body"]))
+    "boundary LR's linear one can't. Random Forest and Gaussian Naive Bayes both underperform LR on Doc2Vec; "
+    "Gaussian Naive Bayes also collapses on LDA features (13% accuracy), since its per-feature Gaussian "
+    "assumption fits topic-probability vectors poorly. SVM, Random Forest and Gaussian Naive Bayes used "
+    "default hyperparameters (not tuned on dev), unlike LR's C; all results are single-seed, single-split "
+    "(test set about 1,200 opinions), so gaps under about 1pp are not reliable.", styles["Body"]))
 
 story.append(Paragraph("Conclusions", styles["H2"]))
 story.append(Paragraph(
@@ -185,7 +187,7 @@ story.append(Paragraph(
     "badly (0.267 vs 48.7% on issue_area), defaulting to majority classes (Criminal Procedure, "
     "Economic Activity) and failing on rare ones; Doc2Vec generalizes far better to minority "
     "categories such as Privacy and Attorneys. Classifier choice mattered almost as much as feature "
-    "extraction: SVM beat every other classifier tried. Our replicated numbers land in the same "
+    "extraction: SVM beat every other classifier tried on Doc2Vec issue_area (on LDA it is only level with LR: 49.1% vs 48.7%). Our replicated numbers land in the same "
     "range and order as the original paper's. We note an internal inconsistency in the paper's own "
     "results table (its printed table and prose disagree on which label granularity scored higher) "
     "and resolve it in favor of the prose. We did not replicate BERT: the paper's own attempt failed "
