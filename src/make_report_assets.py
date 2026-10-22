@@ -166,3 +166,59 @@ try:
     print("Wrote results/figures/classifier_comparison.png")
 except FileNotFoundError:
     pass
+
+# ---------------- Per-category F1: LDA vs Doc2Vec (issue_area, 13 classes) ----------------
+AREA_NAMES = {
+    "1": "Criminal Proc.", "2": "Civil Rights", "3": "1st Amendment", "4": "Due Process",
+    "5": "Privacy", "6": "Attorneys", "7": "Unions", "8": "Economic Act.",
+    "9": "Judicial Power", "10": "Federalism", "11": "Interstate Rel.", "12": "Fed. Taxation",
+    "13": "Misc.",
+}
+cats_sorted = sorted(per_cat["lda_lr"].keys(), key=int)
+lda_f1 = [per_cat["lda_lr"][c]["f1"] for c in cats_sorted]
+d2v_f1 = [per_cat["doc2vec_lr"][c]["f1"] for c in cats_sorted]
+labels_cat = [AREA_NAMES.get(c, c) for c in cats_sorted]
+x = range(len(cats_sorted))
+width = 0.38
+fig, ax = plt.subplots(figsize=(11, 5.5))
+ax.bar([i - width / 2 for i in x], lda_f1, width, label="LDA + LR", color=RED)
+ax.bar([i + width / 2 for i in x], d2v_f1, width, label="Doc2Vec + LR", color=GREEN)
+ax.spines[["top", "right"]].set_visible(False)
+plt.xticks(list(x), labels_cat, rotation=35, ha="right")
+plt.ylabel("Test F1")
+plt.title("Per-Category F1: LDA vs Doc2Vec (issue_area)", fontweight="bold", color=NAVY)
+plt.legend(frameon=False)
+plt.tight_layout()
+plt.savefig("results/figures/per_category_f1.png", dpi=150)
+print("Wrote results/figures/per_category_f1.png")
+
+# ---------------- Progress across phases: Doc2Vec + issue_area test accuracy ----------------
+if tuned:
+    try:
+        with open("results/classifier_comparison.json") as f:
+            cc = json.load(f)
+        svm_doc2vec_area = next(
+            r for r in cc.values()
+            if r["classifier"] == "svm" and r["feature"] == "doc2vec" and r["label_task"] == "issue_area"
+        )
+        phase_labels = ["Phase 1\n(default, LR)", "Phase 2\n(tuned, LR)", "Phase 3\n(tuned, SVM)"]
+        phase_vals = [
+            table1["doc2vec_lr_issue_area"]["test"]["accuracy"],
+            tuned["doc2vec_lr_issue_area"]["test_after"]["accuracy"],
+            svm_doc2vec_area["test"]["accuracy"],
+        ]
+        fig, ax = plt.subplots(figsize=(8, 5.5))
+        colors_seq = [GREY, ACCENT, GREEN]
+        bars = ax.bar(phase_labels, phase_vals, color=colors_seq, width=0.55)
+        ax.plot(range(3), phase_vals, color=NAVY, linewidth=2, marker="o", markersize=8, zorder=5)
+        ax.spines[["top", "right"]].set_visible(False)
+        ax.set_ylim(0, max(phase_vals) * 1.3)
+        plt.ylabel("Test Accuracy")
+        plt.title("Best Model's Accuracy, Phase by Phase\n(Doc2Vec + issue_area)", fontweight="bold", color=NAVY)
+        for i, v in enumerate(phase_vals):
+            plt.text(i, v + 0.025, f"{v:.1%}", ha="center", fontweight="bold", fontsize=14, color=NAVY)
+        plt.tight_layout()
+        plt.savefig("results/figures/progress_by_phase.png", dpi=150)
+        print("Wrote results/figures/progress_by_phase.png")
+    except (FileNotFoundError, StopIteration):
+        pass
