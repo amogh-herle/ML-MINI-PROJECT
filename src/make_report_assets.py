@@ -222,3 +222,36 @@ if tuned:
         print("Wrote results/figures/progress_by_phase.png")
     except (FileNotFoundError, StopIteration):
         pass
+
+# ---------------- Phase 4: deeper tuning (SVM/RF/NB kernels & smoothing) ----------------
+try:
+    with open("results/tuned_classifiers.json") as f:
+        tc = json.load(f)
+    # pick the most interesting before/after pairs to display (has both test_before and test_after)
+    pairs = [(k, r) for k, r in tc.items() if "test_before" in r and "test_after" in r]
+    pairs.sort(key=lambda kv: -(kv[1]["test_after"]["macro_f1"] - kv[1]["test_before"]["macro_f1"]))
+    top = pairs[:5]
+    labels4 = [k.replace("naive_bayes_gaussian", "GaussianNB").replace("random_forest", "RandForest")
+                 .replace("svm", "SVM").replace("_doc2vec_", " / d2v ").replace("_lda_", " / lda ")
+               for k, _ in top]
+    before4 = [r["test_before"]["macro_f1"] for _, r in top]
+    after4 = [r["test_after"]["macro_f1"] for _, r in top]
+    x = range(len(top))
+    width = 0.35
+    fig, ax = plt.subplots(figsize=(10, 5.5))
+    b1 = ax.bar([i - width / 2 for i in x], before4, width, label="Before (Phase 1-3 default)", color=GREY)
+    b2 = ax.bar([i + width / 2 for i in x], after4, width, label="After (Phase 4 tuned)", color=PURPLE)
+    ax.spines[["top", "right"]].set_visible(False)
+    plt.xticks(list(x), labels4, rotation=20, ha="right", fontsize=9)
+    for bars in (b1, b2):
+        for bar in bars:
+            h = bar.get_height()
+            plt.text(bar.get_x() + bar.get_width() / 2, h + 0.01, f"{h:.2f}", ha="center", fontsize=9)
+    plt.ylabel("Test Macro-F1")
+    plt.title("Phase 4: Biggest Gains from Deeper Tuning", fontweight="bold", color=NAVY)
+    plt.legend(frameon=False)
+    plt.tight_layout()
+    plt.savefig("results/figures/phase4_tuning_gains.png", dpi=150)
+    print("Wrote results/figures/phase4_tuning_gains.png")
+except FileNotFoundError:
+    pass
