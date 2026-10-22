@@ -18,55 +18,30 @@ import sys
 import time
 
 sys.path.insert(0, "src")
-from preprocessing import load_corpus, split_records, simple_tokenize
+from pipeline import load_split_tokenize, evaluate_multiclass
 from lda_lr import LDAFeaturizer
 from doc2vec_lr import Doc2VecFeaturizer
 from classifiers import build_svm, build_random_forest, build_naive_bayes, train_predict
-from run_all import filter_rare_classes, evaluate_multiclass
 
 SEED = 42
-LDA_NUM_TOPICS = 100     # Phase 2 winner
+LDA_NUM_TOPICS = 100      # Phase 2 winner
 DOC2VEC_VECTOR_SIZE = 50  # Phase 2 winner
 
 
 def main():
     t0 = time.time()
     print("Loading + splitting corpus (same seed as run_all.py)...")
-    records = load_corpus()
-    records = filter_rare_classes(records)
-    train, dev, test = split_records(records)
-
-    train_tok = [simple_tokenize(r["text"]) for r in train]
-    dev_tok = [simple_tokenize(r["text"]) for r in dev]
-    test_tok = [simple_tokenize(r["text"]) for r in test]
-
-    y_area_train = [r["issue_area"] for r in train]
-    y_area_dev = [r["issue_area"] for r in dev]
-    y_area_test = [r["issue_area"] for r in test]
-    y_issue_train = [r["issue"] for r in train]
-    y_issue_dev = [r["issue"] for r in dev]
-    y_issue_test = [r["issue"] for r in test]
+    data = load_split_tokenize()
 
     print(f"Building LDA features (num_topics={LDA_NUM_TOPICS}, tuned winner)...")
     lda_feat = LDAFeaturizer(num_topics=LDA_NUM_TOPICS, passes=5, seed=SEED)
-    Xtr_lda = lda_feat.fit_transform(train_tok)
-    Xdev_lda = lda_feat.transform(dev_tok)
-    Xtest_lda = lda_feat.transform(test_tok)
+    lda_X = (lda_feat.fit_transform(data["train_tok"]), lda_feat.transform(data["dev_tok"]), lda_feat.transform(data["test_tok"]))
 
     print(f"Building Doc2Vec features (vector_size={DOC2VEC_VECTOR_SIZE}, tuned winner)...")
     d2v_feat = Doc2VecFeaturizer(vector_size=DOC2VEC_VECTOR_SIZE, window=8, epochs=20, seed=SEED)
-    Xtr_d2v = d2v_feat.fit_transform(train_tok)
-    Xdev_d2v = d2v_feat.transform(dev_tok)
-    Xtest_d2v = d2v_feat.transform(test_tok)
+    d2v_X = (d2v_feat.fit_transform(data["train_tok"]), d2v_feat.transform(data["dev_tok"]), d2v_feat.transform(data["test_tok"]))
 
-    feature_sets = {
-        "lda": (Xtr_lda, Xdev_lda, Xtest_lda),
-        "doc2vec": (Xtr_d2v, Xdev_d2v, Xtest_d2v),
-    }
-    label_tasks = {
-        "issue_area": (y_area_train, y_area_dev, y_area_test),
-        "issue": (y_issue_train, y_issue_dev, y_issue_test),
-    }
+    feature_sets = {"lda": lda_X, "doc2vec": d2v_X}
     classifiers = {
         "svm": lambda: build_svm(C=1.0, kernel="rbf"),
         "random_forest": lambda: build_random_forest(n_estimators=200, seed=SEED),
@@ -75,12 +50,12 @@ def main():
 
     results = {}
     for feat_name, (Xtr, Xdev, Xtest) in feature_sets.items():
-        for task_name, (ytr, ydev, ytest) in label_tasks.items():
+        for task_name in ("issue_area", "issue"):
+            ytr, ydev, ytest = data[task_name]
             for clf_name, clf_builder in classifiers.items():
                 key = f"{clf_name}_{feat_name}_{task_name}"
                 print(f"Training {key}...")
-                clf = clf_builder()
-                dev_pred, test_pred = train_predict(clf, Xtr, ytr, Xdev, Xtest)
+                dev_pred, test_pred = train_predict(clf_builder(), Xtr, ytr, Xdev, Xtest)
                 results[key] = {
                     "feature": feat_name,
                     "label_task": task_name,

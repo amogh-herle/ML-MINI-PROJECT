@@ -220,7 +220,10 @@ pip install -r requirements.txt
 python run_all.py                    # Phase 1: downloads corpus (~111MB, cached after first run), replicates both experiments
 python tune_all.py                   # Phase 2: dev-only hyperparameter tuning (slow: several LDA/Doc2Vec refits)
 python compare_classifiers.py        # Phase 3: SVM / Random Forest / Naive Bayes on the tuned feature settings
+python tune_classifiers.py           # Phase 4: deeper grids for the same 3 classifiers, dev macro-F1 selection
 python src/make_report_assets.py     # builds comparison_table.md + charts from the results
+python src/make_writeup_pdf.py       # builds report/writeup.pdf
+python src/make_slides_pptx.py       # builds report/slides.pptx
 ```
 
 ## Conclusions
@@ -247,16 +250,20 @@ python src/make_report_assets.py     # builds comparison_table.md + charts from 
 ## Repo structure
 
 ```
+src/pipeline.py            - shared loader: load -> filter -> split -> tokenize, plus eval helpers
 src/preprocessing.py       - corpus loading (textacy), cleaning, tokenizing, train/dev/test split
 src/lda_lr.py              - LDA topic-distribution featurizer + Logistic Regression (Experiment 1)
 src/doc2vec_lr.py          - Doc2Vec paragraph-embedding featurizer + Logistic Regression (Experiment 2)
 src/classifiers.py         - SVM, Random Forest, Naive Bayes (beyond the paper's own LR)
 src/make_report_assets.py  - builds comparison table + charts from results
 src/make_writeup_pdf.py    - builds report/writeup.pdf from the results JSON files
-run_all.py                 - Phase 1 pipeline: load -> featurize -> train/eval both experiments, both label tasks
-tune_all.py                - Phase 2 pipeline: dev-only hyperparameter tuning per feature extractor + classifier
-compare_classifiers.py     - Phase 3 pipeline: SVM/Random Forest/Naive Bayes on the tuned feature settings
+src/make_slides_pptx.py    - builds report/slides.pptx from the results JSON files
+run_all.py                 - Phase 1: load -> featurize -> train/eval both experiments, both label tasks
+tune_all.py                - Phase 2: dev-only hyperparameter tuning per feature extractor + classifier
+compare_classifiers.py     - Phase 3: SVM/Random Forest/Naive Bayes on the tuned feature settings
+tune_classifiers.py        - Phase 4: deeper SVM/Random Forest/Naive Bayes grids, dev macro-F1 selection
 data/                      - cached textacy SupremeCourt corpus (downloaded on first run)
-results/                   - table1.json, tuned_results.json, classifier_comparison.json, comparison_table.md, figures/
-report/                    - reference paper, write-up PDF
+results/                   - table1.json, tuned_results.json, classifier_comparison.json,
+                              tuned_classifiers.json, comparison_table.md, figures/
+report/                    - reference paper, write-up PDF, slide deck
 ```

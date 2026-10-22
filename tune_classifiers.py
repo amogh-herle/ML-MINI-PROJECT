@@ -5,7 +5,7 @@ Same protocol as tune_all.py (select on DEV macro-F1, test predicted once),
 but with small grids, cached features and progress output.
 
 Usage:
-    python tune_classifiers_light.py
+    python tune_classifiers.py
 """
 import itertools
 import json
@@ -15,12 +15,10 @@ import sys
 import time
 
 sys.path.insert(0, "src")
-from preprocessing import load_corpus, split_records, simple_tokenize
+from pipeline import load_split_tokenize, evaluate_multiclass
 from lda_lr import LDAFeaturizer
 from doc2vec_lr import Doc2VecFeaturizer
-from run_all import filter_rare_classes, evaluate_multiclass
 
-import numpy as np
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.naive_bayes import GaussianNB, MultinomialNB
@@ -73,27 +71,19 @@ def build_features():
             return pickle.load(f)
 
     print("Loading + splitting corpus...")
-    records = filter_rare_classes(load_corpus())
-    train, dev, test = split_records(records)
-
-    train_tok = [simple_tokenize(r["text"]) for r in train]
-    dev_tok = [simple_tokenize(r["text"]) for r in dev]
-    test_tok = [simple_tokenize(r["text"]) for r in test]
+    loaded = load_split_tokenize()
 
     print(f"Building LDA features (num_topics={LDA_NUM_TOPICS}) - this takes a few minutes, only once...")
     lda = LDAFeaturizer(num_topics=LDA_NUM_TOPICS, passes=5, seed=SEED)
-    lda_X = (lda.fit_transform(train_tok), lda.transform(dev_tok), lda.transform(test_tok))
+    lda_X = (lda.fit_transform(loaded["train_tok"]), lda.transform(loaded["dev_tok"]), lda.transform(loaded["test_tok"]))
 
     print(f"Building Doc2Vec features (vector_size={DOC2VEC_VECTOR_SIZE}) - also once...")
     d2v = Doc2VecFeaturizer(vector_size=DOC2VEC_VECTOR_SIZE, window=8, epochs=20, seed=SEED)
-    d2v_X = (d2v.fit_transform(train_tok), d2v.transform(dev_tok), d2v.transform(test_tok))
+    d2v_X = (d2v.fit_transform(loaded["train_tok"]), d2v.transform(loaded["dev_tok"]), d2v.transform(loaded["test_tok"]))
 
     data = {
         "features": {"lda": lda_X, "doc2vec": d2v_X},
-        "labels": {
-            "issue_area": ([r["issue_area"] for r in train], [r["issue_area"] for r in dev], [r["issue_area"] for r in test]),
-            "issue": ([r["issue"] for r in train], [r["issue"] for r in dev], [r["issue"] for r in test]),
-        },
+        "labels": {"issue_area": loaded["issue_area"], "issue": loaded["issue"]},
     }
     os.makedirs("results", exist_ok=True)
     with open(CACHE, "wb") as f:
