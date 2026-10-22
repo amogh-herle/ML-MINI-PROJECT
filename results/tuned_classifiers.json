@@ -1,0 +1,324 @@
+{
+  "svm_lda_issue_area": {
+    "best_params": {
+      "kernel": "linear",
+      "C": 0.1
+    },
+    "dev_after": {
+      "accuracy": 0.5447698744769874,
+      "macro_precision": 0.47920380382233757,
+      "macro_recall": 0.3550530832628614,
+      "macro_f1": 0.37026311642555265
+    },
+    "test_after": {
+      "accuracy": 0.5137844611528822,
+      "macro_precision": 0.34891348189132404,
+      "macro_recall": 0.30372317846660896,
+      "macro_f1": 0.30293300326037476
+    },
+    "test_before": {
+      "accuracy": 0.49122807017543857,
+      "macro_precision": 0.31435384808333733,
+      "macro_recall": 0.27845455964292776,
+      "macro_f1": 0.26554309762746636
+    }
+  },
+  "random_forest_lda_issue_area": {
+    "best_params": {
+      "n_estimators": 200,
+      "max_depth": null,
+      "min_samples_leaf": 3
+    },
+    "dev_after": {
+      "accuracy": 0.49539748953974894,
+      "macro_precision": 0.4349066546074951,
+      "macro_recall": 0.28509919503673625,
+      "macro_f1": 0.2940747645647592
+    },
+    "test_after": {
+      "accuracy": 0.46616541353383456,
+      "macro_precision": 0.36725727998313384,
+      "macro_recall": 0.2525928459199972,
+      "macro_f1": 0.2509656400474852
+    },
+    "test_before": {
+      "accuracy": 0.46115288220551376,
+      "macro_precision": 0.3886427309402473,
+      "macro_recall": 0.24847592689964537,
+      "macro_f1": 0.25256569597706613
+    }
+  },
+  "naive_bayes_gaussian_lda_issue_area": {
+    "best_params": {
+      "var_smoothing": 0.1
+    },
+    "dev_after": {
+      "accuracy": 0.40502092050209204,
+      "macro_precision": 0.3516829053253124,
+      "macro_recall": 0.37068304478982034,
+      "macro_f1": 0.30184110824880855
+    },
+    "test_after": {
+      "accuracy": 0.40350877192982454,
+      "macro_precision": 0.3501777264867728,
+      "macro_recall": 0.36170798680328115,
+      "macro_f1": 0.29440473713314463
+    },
+    "test_before": {
+      "accuracy": 0.1311612364243943,
+      "macro_precision": 0.25136152064453765,
+      "macro_recall": 0.2524966120425173,
+      "macro_f1": 0.13690073009313097
+    }
+  },
+  "naive_bayes_multinomial_lda_issue_area": {
+    "best_params": {
+      "alpha": 0.01
+    },
+    "dev_after": {
+      "accuracy": 0.34644351464435147,
+      "macro_precision": 0.12180259251221028,
+      "macro_recall": 0.12178530890331223,
+      "macro_f1": 0.08152354853813439
+    },
+    "test_after": {
+      "accuracy": 0.33500417710944025,
+      "macro_precision": 0.1114504228568264,
+      "macro_recall": 0.11705426178678559,
+      "macro_f1": 0.0761537904286383
+    }
+  },
+  "svm_lda_issue": {
+    "best_params": {
+      "kernel": "linear",
+      "C": 0.1
+    },
+    "dev_after": {
+      "accuracy": 0.2518828451882845,
+      "macro_precision": 0.19090024157604635,
+      "macro_recall": 0.18081881236679423,
+      "macro_f1": 0.16748341123655391
+    },
+    "test_after": {
+      "accuracy": 0.25647451963241436,
+      "macro_precision": 0.20205839874416626,
+      "macro_recall": 0.1993778597363493,
+      "macro_f1": 0.18022780441985495
+    },
+    "test_before": {
+      "accuracy": 0.18546365914786966,
+      "macro_precision": 0.0981263037943685,
+      "macro_recall": 0.09546679948103277,
+      "macro_f1": 0.08032755163951764
+    }
+  },
+  "random_forest_lda_issue": {
+    "best_params": {
+      "n_estimators": 200,
+      "max_depth": 20,
+      "min_samples_leaf": 3
+    },
+    "dev_after": {
+      "accuracy": 0.22426778242677825,
+      "macro_precision": 0.1547837990442668,
+      "macro_recall": 0.143195333995509,
+      "macro_f1": 0.12890290112462433
+    },
+    "test_after": {
+      "accuracy": 0.2322472848788638,
+      "macro_precision": 0.16071175814075378,
+      "macro_recall": 0.14960950652363877,
+      "macro_f1": 0.13103434749137605
+    },
+    "test_before": {
+      "accuracy": 0.21136173767752714,
+      "macro_precision": 0.13426651180238838,
+      "macro_recall": 0.149715715801775,
+      "macro_f1": 0.12915729253133676
+    }
+  },
+  "naive_bayes_gaussian_lda_issue": {
+    "best_params": {
+      "var_smoothing": 0.1
+    },
+    "dev_after": {
+      "accuracy": 0.1899581589958159,
+      "macro_precision": 0.14611402723916633,
+      "macro_recall": 0.16139980747873772,
+      "macro_f1": 0.127001623394278
+    },
+    "test_after": {
+      "accuracy": 0.20802005012531327,
+      "macro_precision": 0.18264653556862637,
+      "macro_recall": 0.18386472891171435,
+      "macro_f1": 0.14953994893755768
+    },
+    "test_before": {
+      "accuracy": 0.07435254803675856,
+      "macro_precision": 0.09184945986777915,
+      "macro_recall": 0.10068195024321122,
+      "macro_f1": 0.07456412455950931
+    }
+  },
+  "naive_bayes_multinomial_lda_issue": {
+    "best_params": {
+      "alpha": 0.01
+    },
+    "dev_after": {
+      "accuracy": 0.07866108786610879,
+      "macro_precision": 0.011867129646660337,
+      "macro_recall": 0.016943752288579878,
+      "macro_f1": 0.008629979793111434
+    },
+    "test_after": {
+      "accuracy": 0.07518796992481203,
+      "macro_precision": 0.013277242536206341,
+      "macro_recall": 0.018826912336802965,
+      "macro_f1": 0.009200078321767583
+    }
+  },
+  "svm_doc2vec_issue_area": {
+    "best_params": {
+      "kernel": "linear",
+      "C": 0.1
+    },
+    "dev_after": {
+      "accuracy": 0.6510460251046025,
+      "macro_precision": 0.5520548382896248,
+      "macro_recall": 0.5527758482567537,
+      "macro_f1": 0.5458841215539579
+    },
+    "test_after": {
+      "accuracy": 0.633249791144528,
+      "macro_precision": 0.5296405351641819,
+      "macro_recall": 0.5068263373468777,
+      "macro_f1": 0.5120237505220218
+    },
+    "test_before": {
+      "accuracy": 0.6883876357560568,
+      "macro_precision": 0.7002599307886103,
+      "macro_recall": 0.4538644662084854,
+      "macro_f1": 0.49927435622074606
+    }
+  },
+  "random_forest_doc2vec_issue_area": {
+    "best_params": {
+      "n_estimators": 200,
+      "max_depth": 20,
+      "min_samples_leaf": 1
+    },
+    "dev_after": {
+      "accuracy": 0.6117154811715482,
+      "macro_precision": 0.5613194479034334,
+      "macro_recall": 0.3265338625616923,
+      "macro_f1": 0.34218173560432763
+    },
+    "test_after": {
+      "accuracy": 0.5906432748538012,
+      "macro_precision": 0.430790707101193,
+      "macro_recall": 0.30628660604654756,
+      "macro_f1": 0.3168375906591019
+    },
+    "test_before": {
+      "accuracy": 0.595655806182122,
+      "macro_precision": 0.5039631852620572,
+      "macro_recall": 0.30624232787620276,
+      "macro_f1": 0.3170774014721751
+    }
+  },
+  "naive_bayes_gaussian_doc2vec_issue_area": {
+    "best_params": {
+      "var_smoothing": 0.1
+    },
+    "dev_after": {
+      "accuracy": 0.5941422594142259,
+      "macro_precision": 0.49659140932578016,
+      "macro_recall": 0.5619310567097687,
+      "macro_f1": 0.5157845647054122
+    },
+    "test_after": {
+      "accuracy": 0.6015037593984962,
+      "macro_precision": 0.4711140586976079,
+      "macro_recall": 0.4878865461855902,
+      "macro_f1": 0.4744116915954122
+    },
+    "test_before": {
+      "accuracy": 0.5873015873015873,
+      "macro_precision": 0.4735450262398923,
+      "macro_recall": 0.4644888735294523,
+      "macro_f1": 0.46203436655866575
+    }
+  },
+  "svm_doc2vec_issue": {
+    "best_params": {
+      "kernel": "linear",
+      "C": 0.1
+    },
+    "dev_after": {
+      "accuracy": 0.4292887029288703,
+      "macro_precision": 0.3478069091315931,
+      "macro_recall": 0.36438926777567193,
+      "macro_f1": 0.3284845054117343
+    },
+    "test_after": {
+      "accuracy": 0.40100250626566414,
+      "macro_precision": 0.3052829806502783,
+      "macro_recall": 0.315072815480779,
+      "macro_f1": 0.29383031901165296
+    },
+    "test_before": {
+      "accuracy": 0.43107769423558895,
+      "macro_precision": 0.3088245861853034,
+      "macro_recall": 0.27294403153432084,
+      "macro_f1": 0.2647126334144731
+    }
+  },
+  "random_forest_doc2vec_issue": {
+    "best_params": {
+      "n_estimators": 200,
+      "max_depth": null,
+      "min_samples_leaf": 1
+    },
+    "dev_after": {
+      "accuracy": 0.3297071129707113,
+      "macro_precision": 0.2149076151151139,
+      "macro_recall": 0.18569593121351674,
+      "macro_f1": 0.17319862418718987
+    },
+    "test_after": {
+      "accuracy": 0.3391812865497076,
+      "macro_precision": 0.21912285964524889,
+      "macro_recall": 0.1816506728383007,
+      "macro_f1": 0.16954038244706404
+    },
+    "test_before": {
+      "accuracy": 0.34001670843776105,
+      "macro_precision": 0.22463013987727273,
+      "macro_recall": 0.18707815293480934,
+      "macro_f1": 0.17303484874263744
+    }
+  },
+  "naive_bayes_gaussian_doc2vec_issue": {
+    "best_params": {
+      "var_smoothing": 0.1
+    },
+    "dev_after": {
+      "accuracy": 0.4276150627615063,
+      "macro_precision": 0.3515447780898303,
+      "macro_recall": 0.34807907974773106,
+      "macro_f1": 0.3265251259464498
+    },
+    "test_after": {
+      "accuracy": 0.40267335004177107,
+      "macro_precision": 0.3219657912033537,
+      "macro_recall": 0.3065406322202499,
+      "macro_f1": 0.2911227461937971
+    },
+    "test_before": {
+      "accuracy": 0.37092731829573933,
+      "macro_precision": 0.29951250078551284,
+      "macro_recall": 0.2613720963314028,
+      "macro_f1": 0.2521841100791442
+    }
+  }
+}

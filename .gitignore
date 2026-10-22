@@ -225,3 +225,4 @@ __marimo__/
 
 # large dataset cache (auto-downloaded by run_all.py via textacy, ~107MB, exceeds GitHub's 100MB limit)
 data/
+results/feature_cache.pkl
