@@ -28,6 +28,8 @@ WHITE = RGBColor(0xFB, 0xFB, 0xF8)
 CARD_BG = RGBColor(0xFF, 0xFF, 0xFF)
 CARD_BORDER = RGBColor(0xE3, 0xE6, 0xE4)
 GREEN = RGBColor(0x1E, 0x7A, 0x3D)
+RED = RGBColor(0xB3, 0x26, 0x1E)
+PURPLE = RGBColor(0x6B, 0x4F, 0xA0)
 ROW_ALT = RGBColor(0xF2, 0xF2, 0xF2)
 
 prs = Presentation()
@@ -248,10 +250,12 @@ add_card(s, 0.9, 2.0, 5.5, 3.3, "LDA + Logistic Regression",
          "Finds abstract recurring topics across all rulings (gensim, TF-IDF). Each ruling becomes "
          "a mix-of-topics score. A classifier maps topic mix → category.\n\nTuned: 100 topics "
          "(vs. 50 default)")
+add_badge(s, 1.15, 2.25, 0.5, RED, "Σ", size=22)
 add_card(s, 6.6, 2.0, 5.6, 3.3, "Doc2Vec + Logistic Regression",
          "Learns a dense numeric “fingerprint” per ruling by predicting words in context "
          "(gensim Doc2Vec). Same classifier maps fingerprint → category.\n\nTuned: 50-dim "
          "vectors (vs. 100 default)")
+add_badge(s, 6.85, 2.25, 0.5, GREEN, "⌘", size=20)
 add_text(s, 0.9, 5.55, 11.2, 0.6,
          "A third method (BERT) was in the original paper, but it ran out of memory there — no baseline to replicate.",
          size=13, color=TEXT_GREY)
@@ -323,24 +327,36 @@ add_footer(s, 6, 9)
 # ---------------- 8. Insights ----------------
 s = add_slide(LIGHT_BG)
 add_eyebrow(s, "A Closer Look")
-add_text(s, 0.9, 0.95, 11.5, 0.9, "LDA guesses the majority class. Doc2Vec doesn't.",
+add_text(s, 0.9, 0.95, 11.5, 0.7, "LDA guesses the majority class. Doc2Vec doesn't.",
          size=26, color=TEXT_DARK, bold=True)
-lda_card = add_card(s, 0.9, 2.0, 5.5, 3.4, "LDA", "placeholder", title_color=RGBColor(0xB3, 0x26, 0x1E))
-d2v_card = add_card(s, 6.6, 2.0, 5.6, 3.4, "Doc2Vec", "placeholder", title_color=GREEN)
-lda_card.text_frame.paragraphs[1].runs[0].text = (
-    "Macro-F1 (0.267) trails accuracy (48.7%) badly — it defaults to the two biggest categories "
-    "(Criminal Procedure, Economic Activity) and misses rare ones almost entirely (Privacy, "
-    "Attorneys, Interstate Relations: near 0 recall)."
-)
-d2v_card.text_frame.paragraphs[1].runs[0].text = (
-    "Far more balanced — still finds minority categories like Privacy (F1 0.26) and Attorneys "
-    "(F1 0.31) that LDA completely misses, because it reads context, not just word counts."
-)
-add_text(s, 0.9, 5.65, 11.2, 0.5, "Same pattern the original paper reports on its own category breakdown.",
-         size=13, color=TEXT_GREY)
+s.shapes.add_picture("results/figures/per_category_f1.png", Inches(2.17), Inches(1.75), width=Inches(9.0))
+add_accent_bar(s, 1.3, 6.42, 0.22, height=0.22, color=RED)
+add_text(s, 1.65, 6.34, 5.0, 0.4, "LDA — collapses on rare categories (near-0 F1 on Privacy, Attorneys)",
+         size=12, color=TEXT_MUTED)
+add_accent_bar(s, 7.0, 6.42, 0.22, height=0.22, color=GREEN)
+add_text(s, 7.35, 6.34, 5.0, 0.4, "Doc2Vec — far more balanced across all 13 categories",
+         size=12, color=TEXT_MUTED)
 add_footer(s, 7, 9)
 
-# ---------------- 9. Conclusions ----------------
+# ---------------- 9. Progress Across Phases ----------------
+s = add_slide(LIGHT_BG)
+add_eyebrow(s, "Putting It Together")
+add_text(s, 0.9, 0.95, 11.5, 0.9, "Each phase pushed the best model further",
+         size=28, color=TEXT_DARK, bold=True)
+s.shapes.add_picture("results/figures/progress_by_phase.png", Inches(0.9), Inches(2.0), width=Inches(6.0))
+bullets_progress = [
+    "Phase 1: Doc2Vec + Logistic Regression, paper's default settings — 59.1%",
+    "Phase 2: tuned vector_size (100→50) and C on dev only — 62.2%",
+    "Phase 3: swapped in SVM (RBF kernel) on the same features — 68.8%",
+]
+add_checkmark_bullets(s, 7.3, 2.6, 5.1, bullets_progress, size=15,
+                       text_color=TEXT_DARK, badge_color=ACCENT)
+add_text(s, 7.3, 5.3, 5.1, 1.2,
+         "Nearly 10 points of accuracy gained beyond the paper's own result, without touching the dataset.",
+         size=14, color=TEXT_MUTED, italic=True, line_spacing=1.3)
+add_footer(s, 8, 9)
+
+# ---------------- 10. Conclusions ----------------
 s = add_slide(DARK)
 add_eyebrow(s, "Conclusions", dark_bg=True)
 bullets = [
