@@ -153,7 +153,9 @@ def add_card(slide, left, top, width, height, title, body, title_color=ACCENT, a
     return card
 
 
-def add_table(slide, left, top, width, height, header, rows, highlight_row=None, col_widths=None):
+def add_table(slide, left, top, width, height, header, rows, highlight_row=None, col_widths=None, font_size=13):
+    """highlight_row: an int, or a set/list of ints, for rows to tint green."""
+    highlight = {highlight_row} if isinstance(highlight_row, int) else set(highlight_row or [])
     n_rows, n_cols = len(rows) + 1, len(header)
     gshape = slide.shapes.add_table(n_rows, n_cols, Inches(left), Inches(top), Inches(width), Inches(height))
     table = gshape.table
@@ -168,7 +170,7 @@ def add_table(slide, left, top, width, height, header, rows, highlight_row=None,
         p = cell.text_frame.paragraphs[0]
         p.alignment = PP_ALIGN.LEFT if j < 2 else PP_ALIGN.CENTER
         r = p.runs[0]
-        r.font.size = Pt(13)
+        r.font.size = Pt(font_size)
         r.font.bold = True
         r.font.color.rgb = WHITE
         r.font.name = "Arial"
@@ -179,15 +181,15 @@ def add_table(slide, left, top, width, height, header, rows, highlight_row=None,
             cell.text = str(val)
             cell.fill.solid()
             cell.fill.fore_color.rgb = ROW_ALT if (i % 2 == 1) else CARD_BG
-            if highlight_row is not None and i == highlight_row:
+            if i in highlight:
                 cell.fill.fore_color.rgb = RGBColor(0xE8, 0xF3, 0xEC)
             p = cell.text_frame.paragraphs[0]
             p.alignment = PP_ALIGN.LEFT if j < 2 else PP_ALIGN.CENTER
             r = p.runs[0]
-            r.font.size = Pt(13)
+            r.font.size = Pt(font_size)
             r.font.name = "Arial"
-            r.font.color.rgb = GREEN if (highlight_row is not None and i == highlight_row) else TEXT_DARK
-            r.font.bold = highlight_row is not None and i == highlight_row
+            r.font.color.rgb = GREEN if i in highlight else TEXT_DARK
+            r.font.bold = i in highlight
             cell.vertical_anchor = MSO_ANCHOR.MIDDLE
     return table
 
@@ -368,31 +370,48 @@ add_page_dots(s, 6, TOTAL)
 # ---------------- 8. Phase 4 ----------------
 s = add_slide(LIGHT_BG)
 add_eyebrow(s, "Phase 4 — Deeper Tuning")
-add_title(s, "A wider search finds a different kind of win", size=26, height=0.6)
-add_text(s, MARGIN, 1.5, 5.4, 1.0,
+add_title(s, "What tuning really did to accuracy — the full picture", size=24, height=0.55)
+add_text(s, MARGIN, 1.42, 11.2, 0.5,
          "SVM, Random Forest and Naive Bayes from Phase 3 were still untuned. We grid-searched "
-         "kernels, tree depth and smoothing — selected on dev macro-F1, not accuracy.",
-         size=13, color=TEXT_MUTED, line_spacing=1.25)
-label_map4 = {"naive_bayes_gaussian": "GaussianNB", "random_forest": "RandForest", "svm": "SVM"}
-def _p4label(k):
-    for raw, nice in label_map4.items():
-        if k.startswith(raw + "_"):
-            rest = k[len(raw) + 1:]
+         "kernels, tree depth and smoothing — selected on dev macro-F1, not accuracy. All 14 "
+         "feature × task × classifier combinations, in full:",
+         size=12.5, color=TEXT_MUTED, line_spacing=1.2)
+
+names4 = {"svm": "SVM", "random_forest": "Random Forest",
+          "naive_bayes_gaussian": "Naive Bayes (Gaussian)", "naive_bayes_multinomial": "Naive Bayes (Multinomial)"}
+order4 = ["svm", "random_forest", "naive_bayes_gaussian", "naive_bayes_multinomial"]
+def _parse4(k):
+    for clf in order4:
+        if k.startswith(clf + "_"):
+            rest = k[len(clf) + 1:]
             feat, task = ("lda", rest[4:]) if rest.startswith("lda_") else ("doc2vec", rest[8:])
-            task_short = "issue_area" if task == "issue_area" else "issue"
-            return f"{nice} · {feat}/{task_short}"
-    return k
-pairs4 = [(k, r) for k, r in T4.items() if "test_before" in r and "test_after" in r]
-pairs4.sort(key=lambda kv: -(kv[1]["test_after"]["macro_f1"] - kv[1]["test_before"]["macro_f1"]))
-top5 = pairs4[:5]
-rows4 = [[_p4label(k), f"{r['test_before']['macro_f1']:.3f}", f"{r['test_after']['macro_f1']:.3f}"] for k, r in top5]
-header4 = ["Model · feature/task", "F1 Before", "F1 After"]
-add_table(s, MARGIN, 2.65, 5.7, 2.4, header4, rows4, highlight_row=0, col_widths=[3.1, 1.3, 1.3])
-add_text(s, MARGIN, 5.3, 5.4, 1.3,
-         "Gaussian NB's default smoothing was badly miscalibrated for LDA's topic-probability features — "
-         "one knob (var_smoothing) more than doubled its macro-F1.",
-         size=13, color=TEXT_MUTED, line_spacing=1.25)
-s.shapes.add_picture("results/figures/phase4_tuning_gains.png", Inches(6.6), Inches(1.75), width=Inches(5.9))
+            return clf, feat, task
+rows4, highlight_idx = [], []
+sort_key = lambda item: (item[2], item[1], order4.index(item[0]))  # task, feat, classifier order
+parsed = sorted(((*_parse4(k), k, r) for k, r in T4.items()), key=sort_key)
+for i, (clf, feat, task, k, r) in enumerate(parsed):
+    ba = r.get("test_before", {}).get("accuracy")
+    bf = r.get("test_before", {}).get("macro_f1")
+    aa, af = r["test_after"]["accuracy"], r["test_after"]["macro_f1"]
+    rows4.append([
+        names4[clf], feat, "issue_area" if task == "issue_area" else "issue",
+        pct(ba) if ba is not None else "n/a", pct(aa),
+        f"{bf:.3f}" if bf is not None else "n/a", f"{af:.3f}",
+    ])
+    if k in ("svm_doc2vec_issue_area", "naive_bayes_gaussian_lda_issue_area"):
+        highlight_idx.append(i)
+header4 = ["Classifier", "Feature", "Task", "Acc Before", "Acc After", "F1 Before", "F1 After"]
+add_table(s, MARGIN, 2.05, 11.5, 4.1, header4, rows4, highlight_row=highlight_idx,
+          col_widths=[2.1, 1.25, 1.55, 1.5, 1.5, 1.5, 1.5], font_size=10.5)
+
+svm_r, gnb_r = T4["svm_doc2vec_issue_area"], T4["naive_bayes_gaussian_lda_issue_area"]
+add_text(s, MARGIN, 6.3, 11.2, 0.65,
+         f"SVM's accuracy actually dropped ({pct(svm_r['test_before']['accuracy'])} → "
+         f"{pct(svm_r['test_after']['accuracy'])}) even though its F1 rose — tuning for macro-F1 "
+         f"traded raw accuracy for fairness across categories. Gaussian NB on LDA/issue_area is the "
+         f"one case where both rose sharply ({pct(gnb_r['test_before']['accuracy'])} → "
+         f"{pct(gnb_r['test_after']['accuracy'])} accuracy).",
+         size=11.5, color=TEXT_MUTED, line_spacing=1.2, italic=True)
 add_page_dots(s, 7, TOTAL)
 
 # ---------------- 9. Insights ----------------
