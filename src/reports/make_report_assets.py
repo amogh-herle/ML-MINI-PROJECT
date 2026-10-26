@@ -28,6 +28,13 @@ plt.rcParams.update({
     "savefig.facecolor": BG,
 })
 
+def pretty(key):
+    """'lda_lr_issue_area' -> 'LDA · issue_area'; 'doc2vec_lr_issue' -> 'Doc2Vec · issue'."""
+    feat = "LDA" if key.startswith("lda") else "Doc2Vec"
+    task = "issue_area" if key.endswith("issue_area") else "issue"
+    return f"{feat} · {task}"
+
+
 with open("results/table1.json") as f:
     r1 = json.load(f)
 table1 = r1["table1_accuracy"]
@@ -79,7 +86,7 @@ print("Wrote results/comparison_table.md")
 # Bar chart: test accuracy by model x task (phase 1)
 labels, accs = [], []
 for key, r in table1.items():
-    labels.append(key)
+    labels.append(pretty(key))
     accs.append(r["test"]["accuracy"])
 fig, ax = plt.subplots(figsize=(9, 5))
 bars = ax.bar(labels, accs, color=ACCENT, width=0.6)
@@ -104,7 +111,7 @@ if tuned:
     b1 = ax.bar([i - width / 2 for i in x], before, width, label="Phase 1 (default)", color=GREY)
     b2 = ax.bar([i + width / 2 for i in x], after, width, label="Phase 2 (tuned)", color=GREEN)
     ax.spines[["top", "right"]].set_visible(False)
-    plt.xticks(list(x), names, rotation=20, ha="right")
+    plt.xticks(list(x), [pretty(n) for n in names], rotation=20, ha="right")
     for bars in (b1, b2):
         for bar in bars:
             h = bar.get_height()
@@ -157,7 +164,8 @@ try:
         offsets = [xi + (i - 1.5) * width for xi in x]
         bars = ax.bar(offsets, vals, width, label=clf_name.replace("_", " ").title(), color=colors_map[clf_name])
     ax.spines[["top", "right"]].set_visible(False)
-    plt.xticks(list(x), [f"{f}\n{t}" for f, t in combos])
+    feat_names = {"lda": "LDA", "doc2vec": "Doc2Vec"}
+    plt.xticks(list(x), [f"{feat_names[f]}\n{t}" for f, t in combos])
     plt.ylabel("Test Accuracy")
     plt.title("Phase 3: Classifier Comparison (fixed tuned features)", fontweight="bold", color=NAVY)
     plt.legend(frameon=False, ncol=4, loc="upper center", bbox_to_anchor=(0.5, -0.12))
