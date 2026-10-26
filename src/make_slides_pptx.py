@@ -241,7 +241,7 @@ def add_checkmark_bullets(slide, left, top, width, bullets, size=19,
         y += row_h
 
 
-TOTAL = 10  # content slides (excludes cover)
+TOTAL = 11  # content slides (excludes cover)
 
 # ---------------- 1. Cover ----------------
 s = add_slide(DARK)
@@ -427,6 +427,17 @@ add_text(s, 7.35, 6.34, 5.0, 0.4, "Doc2Vec — far more balanced across all 13 c
          size=12, color=TEXT_MUTED)
 add_page_dots(s, 8, TOTAL)
 
+# ---------------- 9. Confusion Matrix ----------------
+s = add_slide(LIGHT_BG)
+add_eyebrow(s, "A Closer Look")
+add_title(s, "Where the best model actually gets confused", size=24, height=0.55)
+s.shapes.add_picture("results/figures/confusion_matrix.png", Inches(3.97), Inches(1.4), width=Inches(5.4))
+add_text(s, MARGIN, 6.35, 11.6, 0.35,
+         "Rows = true category, columns = predicted — Economic Activity pulls in "
+         "misclassifications from Judicial Power and Federalism.",
+         size=11, color=TEXT_MUTED, align=PP_ALIGN.CENTER)
+add_page_dots(s, 9, TOTAL)
+
 # ---------------- 10. Progress Across Phases ----------------
 s = add_slide(LIGHT_BG)
 add_eyebrow(s, "Putting It Together")
@@ -442,7 +453,7 @@ add_checkmark_bullets(s, 7.3, 2.6, 5.1, bullets_progress, size=15,
 add_text(s, 7.3, 5.3, 5.1, 1.2,
          "Nearly 10 points of accuracy gained beyond the paper's own result, without touching the dataset.",
          size=14, color=TEXT_MUTED, italic=True, line_spacing=1.3)
-add_page_dots(s, 9, TOTAL)
+add_page_dots(s, 10, TOTAL)
 
 # ---------------- 11. Conclusions ----------------
 s = add_slide(DARK)
@@ -458,7 +469,7 @@ bullets = [
 ]
 add_checkmark_bullets(s, MARGIN, 1.4, 11.2, bullets, size=17, badge_color=ACCENT_LIGHT, row_h=0.54)
 add_text(s, MARGIN, 6.55, 7, 0.35, "github.com/amogh-herle/ML-MINI-PROJECT", size=13, color=ACCENT_LIGHT)
-add_page_dots(s, 10, TOTAL, dark_bg=True)
+add_page_dots(s, 11, TOTAL, dark_bg=True)
 
 prs.save("report/slides.pptx")
 print("Wrote report/slides.pptx")

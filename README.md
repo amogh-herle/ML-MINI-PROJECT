@@ -230,10 +230,11 @@ python src/make_slides_pptx.py       # builds report/slides.pptx
 
 ```bash
 python train_best_model.py                          # once: trains + saves Doc2Vec+SVM (~1 min)
-python extract_samples.py                            # pulls 5 real test-set opinions into samples/
+python extract_samples.py --n 10                     # pulls 10 real test-set opinions into samples/
 python predict.py --file samples/05_criminal_procedure.txt
 python predict.py "paste any legal text here"        # or classify your own text directly
 python predict.py                                     # no argument: interactive prompt
+python evaluate_best_model.py                         # confusion matrix -> results/figures/confusion_matrix.png
 ```
 
 `predict.py` prints the top-3 predicted `issue_area` categories with confidence
@@ -282,6 +283,7 @@ tune_classifiers.py        - Phase 4: deeper SVM/Random Forest/Naive Bayes grids
 train_best_model.py        - trains + saves Doc2Vec+SVM (the live-demo model) to results/best_model/
 predict.py                 - classify one document (CLI arg, --file, or interactive)
 extract_samples.py         - pulls real test-set opinions into samples/ to try predict.py on
+evaluate_best_model.py     - confusion matrix for the saved best model on the test set
 src/labels.py              - issue_area code -> category name, shared by predict.py and the charts
 data/                      - cached textacy SupremeCourt corpus (downloaded on first run)
 results/                   - table1.json, tuned_results.json, classifier_comparison.json,
