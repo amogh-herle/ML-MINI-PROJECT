@@ -8,9 +8,9 @@ giving the ground-truth label, so you can check predict.py's guess against
 the real answer.
 
 Usage:
-    python extract_samples.py            # writes samples/ (5 by default)
-    python extract_samples.py --n 8      # more samples
-    python predict.py --file samples/01_criminal_procedure.txt
+    python scripts/extract_samples.py            # writes samples/ (5 by default)
+    python scripts/extract_samples.py --n 8      # more samples
+    python scripts/predict.py --file samples/01_criminal_procedure.txt
 """
 import argparse
 import os
@@ -18,9 +18,9 @@ import re
 import sys
 
 sys.path.insert(0, "src")
-from pipeline import filter_rare_classes
-from preprocessing import load_corpus, split_records
-from labels import area_name
+from data.pipeline import filter_rare_classes
+from data.preprocessing import load_corpus, split_records
+from data.labels import area_name
 
 OUT_DIR = "samples"
 
@@ -54,7 +54,7 @@ def main():
     for i in range(1, len(picked) + 1):
         import glob
         f = glob.glob(f"{OUT_DIR}/{i:02d}_*.txt")[0]
-        print(f"  python predict.py --file {f}")
+        print(f"  python scripts/predict.py --file {f}")
 
 
 if __name__ == "__main__":

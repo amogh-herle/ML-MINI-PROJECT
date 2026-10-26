@@ -1,8 +1,9 @@
 # ML-MINI-PROJECT
 
-Classification of US Supreme Court legal opinions — replication + hyperparameter
-tuning of the Stanford CS229 project *"Classification of Legal Text"*
-(Krithika Iyer, 2020).
+Classification of US Supreme Court legal opinions — replicating and extending
+the Stanford CS229 project *"Classification of Legal Text"* (Krithika Iyer,
+2020) across five phases, from the paper's original methods through a modern
+pretrained embedding model.
 
 ## Problem statement
 
@@ -11,10 +12,12 @@ at two granularities:
 - **issue_area** — 15 broad human-curated categories (e.g. Criminal
   Procedure, Civil Rights, First Amendment).
 - **issue** — ~260-280 fine-grained issue codes.
-   
+
 Legal opinions use long, non-standard sentence structures that break typical
-NLP tooling; the paper explores whether topic-model and embedding features,
-fed into a simple classifier, can still recover the human-expert categories.
+NLP tooling. The paper explores whether topic-model and embedding features,
+fed into a simple classifier, can recover the human-expert categories; we
+replicate that, then test whether classifier choice and modern pretrained
+embeddings can do meaningfully better.
 
 ## Dataset
 
@@ -34,33 +37,36 @@ we truncate each to its first 4,000 characters before vectorizing, to keep
 LDA/Doc2Vec training tractable. Most opinions state the issue and holding
 early, so this keeps the dominant vocabulary.
 
-## Approach — methods replicated (paper's Experiments 1 & 2)
+## Approach — three feature extractors, four classifiers, five phases
 
-| # | Method | Paper section | Implementation |
-|---|---|---|---|
-| 1 | LDA (topic model) + Logistic Regression | Experiment 1 | [`src/lda_lr.py`](src/lda_lr.py) — gensim `Dictionary` → `TfidfModel` → `LdaModel`, document = topic-probability vector, sklearn `LogisticRegression` on top |
-| 2 | Doc2Vec (paragraph embeddings) + Logistic Regression | Experiment 2 | [`src/doc2vec_lr.py`](src/doc2vec_lr.py) — gensim `Doc2Vec`, document = learned paragraph vector, sklearn `LogisticRegression` on top |
+| Method | What it is | Training |
+|---|---|---|
+| **LDA** (the paper's Experiment 1) | gensim topic model over TF-IDF; document = topic-probability vector | From scratch, per run |
+| **Doc2Vec** (the paper's Experiment 2) | gensim paragraph-embedding model | From scratch, on our ~5,600 training docs only |
+| **SBERT** (our Phase 5 addition) | `all-MiniLM-L6-v2`, pretrained on 1B+ sentence pairs | **None** — only used to encode |
 
-**Experiment 3 (BERT) is not replicated.** The paper's own BERT attempt ran
-out of memory on Google Colab (even the paid high-RAM tier) and produced no
-results — there is nothing to replicate numerically, only a limitation to
-note.
+Classifiers on top: Logistic Regression (the paper's), plus **SVM**,
+**Random Forest**, and **Gaussian Naive Bayes** (none of which the paper
+tries). **Experiment 3 (BERT fine-tuning) is not replicated** — the paper's
+own attempt ran out of memory on Google Colab and produced no results to
+reproduce; this is a documented limitation, not an oversight.
 
-**Preprocessing** ([`src/preprocessing.py`](src/preprocessing.py)): load via
-textacy, drop unlabeled/rare classes, truncate to 4,000 chars, lowercase +
-regex word tokenization + English stopword removal.
+**Preprocessing** ([`src/data/preprocessing.py`](src/data/preprocessing.py)):
+load via textacy, drop unlabeled/rare classes, truncate to 4,000 chars.
+Two tokenizations are kept: a stopword-stripped bag-of-words (for LDA/Doc2Vec)
+and the raw cleaned text (for SBERT, which needs real sentences — punctuation,
+casing and word order all carry meaning for a pretrained transformer).
 
-**Phase 1 (replicate):** [`run_all.py`](run_all.py) trains LDA+LR and
-Doc2Vec+LR, evaluated on both `issue_area` (15-label) and `issue`
-(fine-grained) tasks, with the paper's rough default settings (LDA
-`num_topics=50`, Doc2Vec `vector_size=100`, LR `C=1.0`) → produces our Table
-1/2 analogs ([`results/table1.json`](results/table1.json)).
+| Phase | Script | What it does |
+|---|---|---|
+| 1 — Replicate | [`scripts/01_replicate.py`](scripts/01_replicate.py) | LDA+LR and Doc2Vec+LR with the paper's rough default settings, both label tasks |
+| 2 — Tune features | [`scripts/02_tune_features.py`](scripts/02_tune_features.py) | Tunes LDA `num_topics` / Doc2Vec `vector_size` and each classifier's `C`, selected on dev |
+| 3 — Compare classifiers | [`scripts/03_compare_classifiers.py`](scripts/03_compare_classifiers.py) | SVM / Random Forest / Naive Bayes vs. LR, same tuned features |
+| 4 — Deep-tune the winner | [`scripts/04_tune_classifiers.py`](scripts/04_tune_classifiers.py) | 40-config grid search on just the single best model (SVM+Doc2Vec+issue_area), selected on dev **accuracy** |
+| 5 — Pretrained embeddings | [`scripts/05_sbert.py`](scripts/05_sbert.py) | Swaps Doc2Vec for SBERT, same classifiers/tasks, zero training |
 
-**Phase 2 (tune):** [`tune_all.py`](tune_all.py) tunes the feature
-extractor's main hyperparameter (LDA `num_topics` ∈ {20, 50, 100}, Doc2Vec
-`vector_size` ∈ {50, 100, 200}) by `issue_area` dev accuracy, then tunes each
-downstream Logistic Regression's `C` per label task on dev, touching test
-exactly once per final config → [`results/tuned_results.json`](results/tuned_results.json).
+All hyperparameter and classifier selection uses only the dev split; test is
+evaluated exactly once per final configuration.
 
 ## A note on the paper's own Table 1
 
@@ -75,6 +81,31 @@ mapping as ground truth, and note this inconsistency for transparency.
 
 ## Results
 
+### Progress across all five phases (Doc2Vec/SBERT + issue_area)
+
+| Phase | Model | Test Acc | Test Macro-F1 |
+|---|---|---|---|
+| 1 — Replicate | Doc2Vec + LR (paper defaults) | 59.1% | 0.463 |
+| 2 — Tune features | Doc2Vec + LR (tuned) | 62.2% | 0.477 |
+| 3 — Compare classifiers | Doc2Vec + SVM (default) | 68.8% | 0.499 |
+| 4 — Deep-tune winner | Doc2Vec + SVM (polynomial kernel) | 68.5% | **0.547** |
+| 5 — Pretrained embeddings | **SBERT + SVM** | **70.1%** | 0.526 |
+
+![Progress across phases](results/figures/progress_by_phase.png)
+
+**Phase 4** selected on dev *accuracy* specifically (earlier phases used
+macro-F1) because the deployed model's accuracy is what matters in practice.
+Even so, test accuracy held flat (68.8%→68.5%, within noise for an
+~850-example test set) while macro-F1 rose meaningfully via a kernel change
+(RBF→polynomial, degree 3).
+
+**Phase 5's SBERT beats every Doc2Vec variant at every feature/task/classifier
+combination tried** — a pretrained model, with zero training, outperforms a
+model trained from scratch on our small corpus. This is the project's
+headline finding: pretraining matters more than hyperparameter tuning.
+
+![Pretrained vs from-scratch embeddings](results/figures/sbert_vs_doc2vec.png)
+
 ### Table 1 — Phase 1 replication (paper's default settings)
 
 | Model | Label task | Dev Acc | Dev Macro-F1 | Test Acc | Test Macro-F1 |
@@ -88,89 +119,44 @@ mapping as ground truth, and note this inconsistency for transparency.
 15-label test accuracy (0.39) sits reasonably close to the paper's 0.47;
 our fine-grained 0.08 matches its 0.13 in the same low range. Doc2Vec+LR
 15-label (0.59) is close to the paper's 0.63; fine-grained (0.37) is below
-its 0.48, likely due to our stricter class filtering (rare-class dropping)
-and the 4,000-character truncation.
+its 0.48, likely due to our stricter class filtering and 4,000-character
+truncation.
 
 Full JSON: [`results/table1.json`](results/table1.json).
 
-![Phase 1 test accuracy](results/figures/phase1_test_accuracy.png)
+### Table 2 — Per-category test performance on issue_area
 
-### Table 2 — Per-category test performance on issue_area (15 classes)
-
-**lda_lr**
-
-| Category | Precision | Recall | F1 | Support |
-|---|---|---|---|---|
-| 1 | 0.38 | 0.88 | 0.53 | 277 |
-| 2 | 0.35 | 0.15 | 0.21 | 198 |
-| 3 | 0.38 | 0.05 | 0.09 | 94 |
-| 4 | 0.00 | 0.00 | 0.00 | 51 |
-| 5 | 0.00 | 0.00 | 0.00 | 16 |
-| 6 | 0.00 | 0.00 | 0.00 | 13 |
-| 7 | 0.71 | 0.23 | 0.34 | 44 |
-| 8 | 0.40 | 0.70 | 0.51 | 242 |
-| 9 | 0.39 | 0.07 | 0.12 | 157 |
-| 10 | 0.00 | 0.00 | 0.00 | 50 |
-| 11 | 0.00 | 0.00 | 0.00 | 8 |
-| 12 | 1.00 | 0.07 | 0.12 | 45 |
-| 13 | 0.00 | 0.00 | 0.00 | 2 |
-
-**doc2vec_lr**
-
-| Category | Precision | Recall | F1 | Support |
-|---|---|---|---|---|
-| 1 | 0.82 | 0.73 | 0.77 | 277 |
-| 2 | 0.61 | 0.57 | 0.59 | 198 |
-| 3 | 0.62 | 0.66 | 0.64 | 94 |
-| 4 | 0.30 | 0.45 | 0.36 | 51 |
-| 5 | 0.20 | 0.38 | 0.26 | 16 |
-| 6 | 0.22 | 0.54 | 0.31 | 13 |
-| 7 | 0.52 | 0.64 | 0.57 | 44 |
-| 8 | 0.70 | 0.59 | 0.64 | 242 |
-| 9 | 0.48 | 0.44 | 0.46 | 157 |
-| 10 | 0.39 | 0.36 | 0.38 | 50 |
-| 11 | 0.21 | 0.62 | 0.31 | 8 |
-| 12 | 0.73 | 0.73 | 0.73 | 45 |
-| 13 | 0.00 | 0.00 | 0.00 | 2 |
+![Per-category F1](results/figures/per_category_f1.png)
 
 Numbered categories follow the SCDB `issue_area` codes (1=Criminal
 Procedure, 2=Civil Rights, 3=First Amendment, 4=Due Process, 5=Privacy,
 6=Attorneys, 7=Unions, 8=Economic Activity, 9=Judicial Power, 10=Federalism,
-11=Interstate Relations, 12=Federal Taxation, 13=Miscellaneous). Doc2Vec
-clearly generalizes better to minority categories (5, 6, 11) than LDA, which
-collapses to the majority classes (1, 8) — same pattern the paper itself
-reports on its own Table 2.
+11=Interstate Relations, 12=Federal Taxation, 13=Miscellaneous). Both
+Doc2Vec and SBERT generalize far better to minority categories (5, 6, 11)
+than LDA, which collapses to the majority classes (1, 8) — same pattern the
+paper itself reports on its own Table 2.
 
-### Phase 2 — Before/after hyperparameter tuning (dev-selected, test touched once)
+### Confusion matrix — the deployed model (SBERT + SVM)
 
-| Model + Task | Extra Param | Best C | Test Acc Before | Test Acc After | Test Macro-F1 After |
-|---|---|---|---|---|---|
-| lda_lr_issue_area | num_topics=100 | 10.0 | 0.3935 | **0.4871** | 0.2674 |
-| lda_lr_issue | num_topics=100 | 10.0 | 0.0827 | **0.1988** | 0.0843 |
-| doc2vec_lr_issue_area | vector_size=50 | 1.0 | 0.5915 | **0.6224** | 0.4769 |
-| doc2vec_lr_issue | vector_size=50 | 0.1 | 0.3709 | **0.4202** | 0.2888 |
+![Confusion matrix](results/figures/confusion_matrix.png)
 
-Full JSON: [`results/tuned_results.json`](results/tuned_results.json).
+Economic Activity (the largest category) pulls in misclassifications from
+Judicial Power (35 opinions) and Federalism (21) — a concrete picture of
+the majority-class-bias pattern above.
 
-![Before vs after tuning](results/figures/before_after_tuning.png)
+### Error analysis
 
-**Summary:** tuning gave clear gains everywhere this time (unlike the prior
-Weibo project, where the paper's defaults were already near-optimal). LDA
-benefited most from more topics (`num_topics` 50→100: issue_area test acc
-+9.4pp, fine-grained issue +11.6pp) — 50 topics was simply too coarse to
-separate 15+ categories. Doc2Vec actually preferred a *smaller* embedding
-(`vector_size` 100→50): with ~5,600 training documents, a 200-dim vector
-overfits before the classifier sees enough signal, so halving it to 50
-improved both tasks (issue_area +3.1pp, fine-grained issue +4.9pp).
+A confident mistake: an **Attorneys** fee-dispute opinion, whose text is
+dominated by bond/surety financial language, was classified as **Federal
+Taxation** at 97% confidence — the model reads surface vocabulary, not legal
+reasoning. A clear correct call: an opinion with explicit labor-law
+vocabulary ("Secretary of Labor," "union election," "Labor-Management
+Reporting and Disclosure Act") was correctly classified as **Unions**. The
+pattern holds throughout: the model does well when a case's language
+matches its category, and struggles when the real legal issue is buried
+under financial or procedural detail.
 
-### Phase 3 — Classifier comparison (beyond the paper: SVM, Random Forest, Naive Bayes)
-
-The paper only tries Logistic Regression on top of its two feature extractors.
-We additionally compare **SVM** (margin-based, RBF kernel), **Random Forest**
-(ensemble of decision trees), and **Gaussian Naive Bayes** (Bayes' theorem)
-on the exact same feature vectors (LDA at `num_topics=100`, Doc2Vec at
-`vector_size=50` — Phase 2's winning settings) — isolating the effect of
-classifier choice from feature extraction.
+### Classifier comparison (Phase 3, full data)
 
 | Classifier | Feature | Label task | Test Acc | Test Macro-F1 |
 |---|---|---|---|---|
@@ -190,104 +176,108 @@ classifier choice from feature extraction.
 | svm | lda | issue | 0.1855 | 0.0803 |
 | naive_bayes | lda | issue | 0.0744 | 0.0746 |
 
-Note: SVM, Random Forest and Gaussian Naive Bayes were run with default
-hyperparameters and not tuned on dev, unlike Logistic Regression's `C`. All
-results are single-seed, single-split (test set about 1,200 opinions), so gaps
-under about 1 percentage point are not reliable.
+SVM, Random Forest and Gaussian Naive Bayes ran with default hyperparameters
+(not tuned on dev) in this phase, unlike Logistic Regression's `C`. All
+results are single-seed, single-split (test set ~1,200 opinions), so gaps
+under ~1 percentage point are not reliable. Random Forest and Naive Bayes
+both underperform Logistic Regression on Doc2Vec; Naive Bayes collapses
+especially badly on LDA (13% accuracy) since its per-feature Gaussian
+assumption doesn't fit topic-probability vectors.
 
-Full JSON: [`results/classifier_comparison.json`](results/classifier_comparison.json).
-
-![Classifier comparison](results/figures/classifier_comparison.png)
-
-**Summary: SVM is the new overall best model** — SVM + Doc2Vec on
-`issue_area` reaches **68.8% test accuracy**, beating Logistic Regression's
-62.2% on the same features (+6.6pp), because the RBF kernel can draw a
-non-linear boundary through the 50-dimensional embedding space where LR's
-linear boundary can't. Random Forest and Gaussian Naive Bayes both underperform
-Logistic Regression on Doc2Vec features — Random Forest likely because
-decision-tree splits don't exploit the smooth, dense structure of a learned
-embedding well, and Gaussian Naive Bayes because its independence assumption
-between the 50 embedding dimensions doesn't hold (they're highly
-correlated by construction). On LDA features, Gaussian Naive Bayes collapses
-especially badly (13% accuracy, near chance) — its per-feature Gaussian
-assumption fits topic-probability vectors (which are small positive numbers
-summing to ~1, not normally distributed) poorly.
+Full JSONs: [`results/classifier_comparison.json`](results/classifier_comparison.json),
+[`results/tuned_classifiers.json`](results/tuned_classifiers.json),
+[`results/sbert_results.json`](results/sbert_results.json).
 
 ## Setup & running
 
 ```bash
 pip install -r requirements.txt
-python run_all.py                    # Phase 1: downloads corpus (~111MB, cached after first run), replicates both experiments
-python tune_all.py                   # Phase 2: dev-only hyperparameter tuning (slow: several LDA/Doc2Vec refits)
-python compare_classifiers.py        # Phase 3: SVM / Random Forest / Naive Bayes on the tuned feature settings
-python tune_classifiers.py           # Phase 4: deeper grids for the same 3 classifiers, dev macro-F1 selection
-python src/make_report_assets.py     # builds comparison_table.md + charts from the results
-python src/make_writeup_pdf.py       # builds report/writeup.pdf
-python src/make_slides_pptx.py       # builds report/slides.pptx
+python scripts/01_replicate.py           # Phase 1: downloads corpus (~111MB, cached after), replicates both methods
+python scripts/02_tune_features.py       # Phase 2: dev-only hyperparameter tuning (slow: several LDA/Doc2Vec refits)
+python scripts/03_compare_classifiers.py # Phase 3: SVM / Random Forest / Naive Bayes on the tuned features
+python scripts/04_tune_classifiers.py    # Phase 4: deep grid search on just the Phase 3 winner, dev-accuracy selected
+python scripts/05_sbert.py               # Phase 5: SBERT vs Doc2Vec, same classifiers/tasks
+python src/reports/make_report_assets.py # builds comparison_table.md + all charts from the results
+python src/reports/make_writeup_pdf.py   # builds report/writeup.pdf
+python src/reports/make_slides_pptx.py   # builds report/slides.pptx
 ```
 
 ### Live demo: classify one document
 
 ```bash
-python train_best_model.py                          # once: trains + saves Doc2Vec+SVM (~1 min)
-python extract_samples.py --n 10                     # pulls 10 real test-set opinions into samples/
-python predict.py --file samples/05_criminal_procedure.txt
-python predict.py "paste any legal text here"        # or classify your own text directly
-python predict.py                                     # no argument: interactive prompt
-python evaluate_best_model.py                         # confusion matrix -> results/figures/confusion_matrix.png
+python scripts/train_best_model.py                    # once: trains + saves SBERT+SVM, the overall best model (~5 min)
+python scripts/extract_samples.py --n 10               # pulls 10 real test-set opinions into samples/
+python scripts/predict.py --file samples/05_criminal_procedure.txt
+python scripts/predict.py "paste any legal text here"  # or classify your own text directly
+python scripts/predict.py                               # no argument: interactive prompt
+python scripts/evaluate_best_model.py                   # confusion matrix -> results/figures/confusion_matrix.png
 ```
 
-`predict.py` prints the top-3 predicted `issue_area` categories with confidence
-scores. `extract_samples.py` writes real opinions from the held-out test split
-(with their ground-truth label in a `#`-comment header that `predict.py`
-strips before classifying, so it can't leak into the prediction) — useful
-both for a live demo and for sanity-checking the model on text it never
-trained on.
+`predict.py` prints the top-3 predicted `issue_area` categories with
+confidence scores, using the saved SBERT+SVM model (70.1% test accuracy —
+our best across all five phases). `extract_samples.py` writes real opinions
+from the held-out test split (with their ground-truth label in a
+`#`-comment header that `predict.py` strips before classifying, so it can't
+leak into the prediction).
 
 ## Conclusions
 
-- Both the paper's and our results agree on the overall pattern: Doc2Vec
-  embeddings consistently outperform LDA topic-distribution features for
-  this task, and the coarser 15-category task is much easier than the
-  260+-category fine-grained task — unsurprising given how thin per-class
-  training data gets at that granularity.
-- LDA's macro-F1 is far below its accuracy (e.g. 0.156 vs 0.382 on
-  issue_area dev) — a sign it's defaulting to the majority classes
-  (Criminal Procedure, Economic Activity) and failing on rare categories,
-  matching the paper's own observation that large document collections
-  "do not necessarily lead to better results" for some categories.
-- Beyond the paper's own Logistic Regression, **SVM is the strongest
-  classifier we found** — 68.8% test accuracy on Doc2Vec+issue_area, a
-  clear improvement over every other classifier/feature combination tried.
-  Classifier choice mattered almost as much as feature extraction here.
-- We did not replicate BERT: the paper's own attempt failed on memory
-  limits, so there is no baseline number to reproduce. Future work could
-  revisit this with a long-document Transformer variant (Longformer,
-  Reformer) as the paper itself suggests.
+- **Pretrained embeddings (SBERT) beat from-scratch ones (Doc2Vec) at every
+  single comparison point** — the project's headline finding. A model that's
+  never seen a court opinion before, with zero training, outperforms one
+  trained from scratch on our corpus.
+- **Classifier choice matters almost as much as features**: SVM beat every
+  other classifier tried, on both Doc2Vec and SBERT features.
+- Tuning gave real gains in Phases 1-3; Phase 4's deeper search on the
+  single best model traded flat accuracy for a meaningful macro-F1 gain —
+  a reminder that dev-set selection metric shapes what "improvement" means.
+- LDA's macro-F1 is far below its accuracy — it defaults to majority classes
+  (Criminal Procedure, Economic Activity) and fails on rare ones, matching
+  the paper's own observation that large document collections "do not
+  necessarily lead to better results" for some categories.
+- The coarse 15-category task is far easier than the 260+-category one
+  everywhere we tried (best ~48% accuracy on `issue`) — a data scarcity
+  problem, not a model-choice problem.
+- Our replicated numbers land in the same range and order as the original
+  paper's. We did not replicate BERT fine-tuning — the paper's own attempt
+  failed on memory limits — but Phase 5's SBERT is a frozen-embedding
+  alternative that captures much of the same pretraining benefit without
+  that cost. A legal-domain pretrained model (Legal-BERT) and full BERT
+  fine-tuning remain natural next steps.
 
 ## Repo structure
 
 ```
-src/pipeline.py            - shared loader: load -> filter -> split -> tokenize, plus eval helpers
-src/preprocessing.py       - corpus loading (textacy), cleaning, tokenizing, train/dev/test split
-src/lda_lr.py              - LDA topic-distribution featurizer + Logistic Regression (Experiment 1)
-src/doc2vec_lr.py          - Doc2Vec paragraph-embedding featurizer + Logistic Regression (Experiment 2)
-src/classifiers.py         - SVM, Random Forest, Naive Bayes (beyond the paper's own LR)
-src/make_report_assets.py  - builds comparison table + charts from results
-src/make_writeup_pdf.py    - builds report/writeup.pdf from the results JSON files
-src/make_slides_pptx.py    - builds report/slides.pptx from the results JSON files
-run_all.py                 - Phase 1: load -> featurize -> train/eval both experiments, both label tasks
-tune_all.py                - Phase 2: dev-only hyperparameter tuning per feature extractor + classifier
-compare_classifiers.py     - Phase 3: SVM/Random Forest/Naive Bayes on the tuned feature settings
-tune_classifiers.py        - Phase 4: deeper SVM/Random Forest/Naive Bayes grids, dev macro-F1 selection
-train_best_model.py        - trains + saves Doc2Vec+SVM (the live-demo model) to results/best_model/
-predict.py                 - classify one document (CLI arg, --file, or interactive)
-extract_samples.py         - pulls real test-set opinions into samples/ to try predict.py on
-evaluate_best_model.py     - confusion matrix for the saved best model on the test set
-src/labels.py              - issue_area code -> category name, shared by predict.py and the charts
-data/                      - cached textacy SupremeCourt corpus (downloaded on first run)
-results/                   - table1.json, tuned_results.json, classifier_comparison.json,
-                              tuned_classifiers.json, comparison_table.md, figures/, best_model/
-samples/                   - example opinions for the live demo (see extract_samples.py)
-report/                    - reference paper, write-up PDF, slide deck
+scripts/
+  01_replicate.py           - Phase 1: load -> featurize -> train/eval LDA+Doc2Vec, both label tasks
+  02_tune_features.py       - Phase 2: dev-only tuning of feature extractors + classifier C
+  03_compare_classifiers.py - Phase 3: SVM/Random Forest/Naive Bayes vs. LR on tuned features
+  04_tune_classifiers.py    - Phase 4: deep grid search on just the Phase 3 winner, dev-accuracy selected
+  05_sbert.py                - Phase 5: SBERT vs Doc2Vec, same classifiers/tasks
+  train_best_model.py        - trains + saves SBERT+SVM (the live-demo model) to results/best_model/
+  predict.py                 - classify one document (CLI arg, --file, or interactive)
+  extract_samples.py         - pulls real test-set opinions into samples/ to try predict.py on
+  evaluate_best_model.py     - confusion matrix for the saved best model on the test set
+
+src/
+  data/
+    preprocessing.py  - corpus loading (textacy), cleaning, tokenizing, train/dev/test split
+    pipeline.py        - shared loader: load -> filter -> split -> tokenize, plus eval helpers
+    labels.py           - issue_area code -> category name
+  models/
+    lda_lr.py           - LDA topic-distribution featurizer + Logistic Regression (Experiment 1)
+    doc2vec_lr.py        - Doc2Vec paragraph-embedding featurizer + Logistic Regression (Experiment 2)
+    sbert_lr.py           - pretrained SBERT featurizer + Logistic Regression (Phase 5)
+    classifiers.py         - SVM, Random Forest, Naive Bayes (beyond the paper's own LR)
+  reports/
+    make_report_assets.py  - builds comparison table + all charts from the results
+    make_writeup_pdf.py     - builds report/writeup.pdf
+    make_slides_pptx.py      - builds report/slides.pptx
+
+data/      - cached textacy SupremeCourt corpus (downloaded on first run)
+results/   - table1.json, tuned_results.json, classifier_comparison.json,
+             tuned_classifiers.json, sbert_results.json, confusion_matrix.json,
+             comparison_table.md, figures/, best_model/
+samples/   - example opinions for the live demo (see extract_samples.py)
+report/    - reference paper, write-up PDF, slide deck
 ```

@@ -5,7 +5,7 @@ Pulled out of run_all.py to stop four scripts from re-implementing the same
 """
 from collections import Counter
 
-from preprocessing import load_corpus, split_records, simple_tokenize
+from data.preprocessing import load_corpus, split_records, simple_tokenize
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 
 MIN_ISSUE_COUNT = 10  # drop fine-grained issue codes with too few examples to stratify/evaluate
@@ -31,6 +31,13 @@ def load_split_tokenize():
         "train_tok": [simple_tokenize(r["text"]) for r in train],
         "dev_tok": [simple_tokenize(r["text"]) for r in dev],
         "test_tok": [simple_tokenize(r["text"]) for r in test],
+        # raw (cleaned but NOT stopword-stripped/lowercased) text, for models like
+        # SBERT that need real sentences -- punctuation, casing, word order, stopwords
+        # all carry meaning for a pretrained transformer; our bag-of-words tokenizer
+        # throws all of that away, which would defeat the point of using it
+        "train_text": [r["text"] for r in train],
+        "dev_text": [r["text"] for r in dev],
+        "test_text": [r["text"] for r in test],
         "issue_area": (
             [r["issue_area"] for r in train], [r["issue_area"] for r in dev], [r["issue_area"] for r in test],
         ),

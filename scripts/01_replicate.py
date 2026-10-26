@@ -15,16 +15,16 @@ Dataset: real Supreme Court Database corpus via textacy.datasets.SupremeCourt
 substitute needed this time.
 
 Usage:
-    python run_all.py
+    python scripts/01_replicate.py
 """
 import json
 import sys
 import time
 
 sys.path.insert(0, "src")
-from pipeline import load_split_tokenize, evaluate_multiclass, per_class_report
-from lda_lr import LDAFeaturizer, train_lda_lr
-from doc2vec_lr import Doc2VecFeaturizer, train_doc2vec_lr
+from data.pipeline import load_split_tokenize, evaluate_multiclass, per_class_report
+from models.lda_lr import LDAFeaturizer, train_lda_lr
+from models.doc2vec_lr import Doc2VecFeaturizer, train_doc2vec_lr
 
 SEED = 42
 

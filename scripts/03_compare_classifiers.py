@@ -9,19 +9,19 @@ the effect of classifier choice from the effect of feature extraction, which
 Phase 1/2 already tuned.
 
 Usage:
-    python run_all.py        # must run first (downloads/caches corpus)
-    python tune_all.py       # must run first (confirms best feature settings)
-    python compare_classifiers.py
+    python scripts/01_replicate.py           # must run first (downloads/caches corpus)
+    python scripts/02_tune_features.py       # must run first (confirms best feature settings)
+    python scripts/03_compare_classifiers.py
 """
 import json
 import sys
 import time
 
 sys.path.insert(0, "src")
-from pipeline import load_split_tokenize, evaluate_multiclass
-from lda_lr import LDAFeaturizer
-from doc2vec_lr import Doc2VecFeaturizer
-from classifiers import build_svm, build_random_forest, build_naive_bayes, train_predict
+from data.pipeline import load_split_tokenize, evaluate_multiclass
+from models.lda_lr import LDAFeaturizer
+from models.doc2vec_lr import Doc2VecFeaturizer
+from models.classifiers import build_svm, build_random_forest, build_naive_bayes, train_predict
 
 SEED = 42
 LDA_NUM_TOPICS = 100      # Phase 2 winner

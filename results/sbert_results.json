@@ -1,0 +1,58 @@
+{
+  "sbert_lr_issue_area": {
+    "dev": {
+      "accuracy": 0.6887029288702929,
+      "macro_precision": 0.6796069149906058,
+      "macro_recall": 0.4834387208465116,
+      "macro_f1": 0.5153615763398371
+    },
+    "test": {
+      "accuracy": 0.6649958228905597,
+      "macro_precision": 0.672732582240701,
+      "macro_recall": 0.4340679285171512,
+      "macro_f1": 0.4580138348935994
+    }
+  },
+  "sbert_svm_issue_area": {
+    "dev": {
+      "accuracy": 0.7288702928870293,
+      "macro_precision": 0.7405724392231409,
+      "macro_recall": 0.5622776365674201,
+      "macro_f1": 0.5938581229097749
+    },
+    "test": {
+      "accuracy": 0.7009189640768588,
+      "macro_precision": 0.6497697334649639,
+      "macro_recall": 0.49498782210546255,
+      "macro_f1": 0.5257496540057665
+    }
+  },
+  "sbert_lr_issue": {
+    "dev": {
+      "accuracy": 0.4510460251046025,
+      "macro_precision": 0.2693995182888891,
+      "macro_recall": 0.2560741008007897,
+      "macro_f1": 0.23470455045472996
+    },
+    "test": {
+      "accuracy": 0.43859649122807015,
+      "macro_precision": 0.2782680888289499,
+      "macro_recall": 0.24621582132336825,
+      "macro_f1": 0.23289576870703518
+    }
+  },
+  "sbert_svm_issue": {
+    "dev": {
+      "accuracy": 0.4903765690376569,
+      "macro_precision": 0.3504285699128812,
+      "macro_recall": 0.3174299493595977,
+      "macro_f1": 0.30613004120466597
+    },
+    "test": {
+      "accuracy": 0.48370927318295737,
+      "macro_precision": 0.37613712035484664,
+      "macro_recall": 0.32373962234533266,
+      "macro_f1": 0.31740679699595536
+    }
+  }
+}

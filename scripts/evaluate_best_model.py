@@ -1,20 +1,20 @@
 """
-Confusion matrix for the live-demo model (Doc2Vec + SVM, issue_area, the
-68.8%-accuracy model highlighted throughout the deck/write-up) on the
+Confusion matrix for the live-demo model (SBERT + SVM, issue_area, the
+70.1%-accuracy model highlighted throughout the deck/write-up) on the
 held-out test set. Loads the artifacts train_best_model.py saved -- doesn't
 retrain anything.
 
 Usage:
-    python train_best_model.py      # must run first
-    python evaluate_best_model.py
+    python scripts/train_best_model.py      # must run first
+    python scripts/evaluate_best_model.py
 """
 import json
 import sys
 
 sys.path.insert(0, "src")
-from pipeline import load_split_tokenize
-from labels import AREA_NAMES
-from gensim.models.doc2vec import Doc2Vec
+from data.pipeline import load_split_tokenize
+from data.labels import AREA_NAMES
+from sentence_transformers import SentenceTransformer
 import joblib
 import numpy as np
 import matplotlib
@@ -28,16 +28,16 @@ NAVY = "#142340"
 
 def main():
     print("Loading saved model...")
-    d2v = Doc2Vec.load(f"{MODEL_DIR}/doc2vec.model")
-    clf = joblib.load(f"{MODEL_DIR}/svm.joblib")
     meta = joblib.load(f"{MODEL_DIR}/meta.joblib")
+    sbert = SentenceTransformer(meta["model_name"])
+    clf = joblib.load(f"{MODEL_DIR}/svm.joblib")
 
     print("Loading test split (same seed as train_best_model.py)...")
     data = load_split_tokenize()
     _, _, ytest = data["issue_area"]
 
     print("Predicting on test set...")
-    Xtest = np.vstack([d2v.infer_vector(t, epochs=meta["epochs"]) for t in data["test_tok"]])
+    Xtest = sbert.encode(data["test_text"], show_progress_bar=False)
     ypred = clf.predict(Xtest)
 
     labels = sorted(AREA_NAMES.keys())
@@ -57,7 +57,7 @@ def main():
     ax.set_yticklabels(names, fontsize=9)
     ax.set_xlabel("Predicted category")
     ax.set_ylabel("True category")
-    ax.set_title("Confusion Matrix: SVM + Doc2Vec (issue_area, test set)", fontweight="bold", color=NAVY)
+    ax.set_title("Confusion Matrix: SBERT + SVM (issue_area, test set)", fontweight="bold", color=NAVY)
     for i in range(len(names)):
         for j in range(len(names)):
             if cm[i, j] > 0:

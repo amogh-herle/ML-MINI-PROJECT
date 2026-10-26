@@ -192,36 +192,111 @@ plt.tight_layout()
 plt.savefig("results/figures/per_category_f1.png", dpi=150)
 print("Wrote results/figures/per_category_f1.png")
 
-# ---------------- Progress across phases: Doc2Vec + issue_area test accuracy ----------------
-if tuned:
-    try:
-        with open("results/classifier_comparison.json") as f:
-            cc = json.load(f)
-        svm_doc2vec_area = next(
-            r for r in cc.values()
-            if r["classifier"] == "svm" and r["feature"] == "doc2vec" and r["label_task"] == "issue_area"
-        )
-        phase_labels = ["Phase 1\n(default, LR)", "Phase 2\n(tuned, LR)", "Phase 3\n(tuned, SVM)"]
-        phase_vals = [
-            table1["doc2vec_lr_issue_area"]["test"]["accuracy"],
-            tuned["doc2vec_lr_issue_area"]["test_after"]["accuracy"],
-            svm_doc2vec_area["test"]["accuracy"],
-        ]
-        fig, ax = plt.subplots(figsize=(8, 5.5))
-        colors_seq = [GREY, ACCENT, GREEN]
-        bars = ax.bar(phase_labels, phase_vals, color=colors_seq, width=0.55)
-        ax.plot(range(3), phase_vals, color=NAVY, linewidth=2, marker="o", markersize=8, zorder=5)
+# ---------------- Phase 4: deep-tuned SVM (single model, before/after) ----------------
+phase4 = None
+try:
+    with open("results/tuned_classifiers.json") as f:
+        phase4 = json.load(f)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9, 5.5))
+    for ax, metric, label, fmt in [
+        (ax1, "accuracy", "Test Accuracy", lambda v: f"{v:.1%}"),
+        (ax2, "macro_f1", "Test Macro-F1", lambda v: f"{v:.3f}"),
+    ]:
+        vals = [phase4["test_before"][metric], phase4["test_after"][metric]]
+        ax.bar(["Before", "After"], vals, color=[GREY, PURPLE], width=0.5)
         ax.spines[["top", "right"]].set_visible(False)
-        ax.set_ylim(0, max(phase_vals) * 1.3)
-        plt.ylabel("Test Accuracy")
-        plt.title("Best Model's Accuracy, Phase by Phase\n(Doc2Vec + issue_area)", fontweight="bold", color=NAVY)
-        for i, v in enumerate(phase_vals):
-            plt.text(i, v + 0.025, f"{v:.1%}", ha="center", fontweight="bold", fontsize=14, color=NAVY)
-        plt.tight_layout()
-        plt.savefig("results/figures/progress_by_phase.png", dpi=150)
-        print("Wrote results/figures/progress_by_phase.png")
-    except (FileNotFoundError, StopIteration):
+        ax.set_ylim(0, max(vals) * 1.3)
+        ax.set_ylabel(label)
+        for i, v in enumerate(vals):
+            ax.text(i, v + max(vals) * 0.03, fmt(v), ha="center", fontweight="bold", fontsize=14, color=NAVY)
+    fig.suptitle("Phase 4: Deep-Tuned SVM (Doc2Vec + issue_area)", fontweight="bold", color=NAVY)
+    plt.tight_layout()
+    plt.savefig("results/figures/phase4_before_after.png", dpi=150)
+    print("Wrote results/figures/phase4_before_after.png")
+except FileNotFoundError:
+    pass
+
+# ---------------- Phase 5: SBERT vs Doc2Vec ----------------
+try:
+    with open("results/sbert_results.json") as f:
+        sbert = json.load(f)
+    with open("results/classifier_comparison.json") as f:
+        cc = json.load(f)  # Phase 3's Doc2Vec+SVM baseline, covers both tasks (Phase 4 only covers issue_area)
+
+    def doc2vec_acc(task, clf):
+        if clf == "LR":
+            return tuned[f"doc2vec_lr_{task}"]["test_after"]["accuracy"]
+        if task == "issue_area" and phase4:  # Phase 4's deep-tuned SVM, when available
+            return phase4["test_after"]["accuracy"]
+        return cc[f"svm_doc2vec_{task}"]["test"]["accuracy"]  # Phase 3's default SVM otherwise
+
+    combos = [("issue_area", "LR"), ("issue_area", "SVM"), ("issue", "LR"), ("issue", "SVM")]
+    d2v_vals, sbert_vals, xlabels = [], [], []
+    for task, clf in combos:
+        clf_key = "lr" if clf == "LR" else "svm"
+        d2v_vals.append(doc2vec_acc(task, clf))
+        sbert_vals.append(sbert[f"sbert_{clf_key}_{task}"]["test"]["accuracy"])
+        xlabels.append(f"{task}\n{clf}")
+    x = range(len(xlabels))
+    width = 0.35
+    fig, ax = plt.subplots(figsize=(9, 5.5))
+    b1 = ax.bar([i - width / 2 for i in x], d2v_vals, width, label="Doc2Vec (from scratch)", color=GREY)
+    b2 = ax.bar([i + width / 2 for i in x], sbert_vals, width, label="SBERT (pretrained)", color=ACCENT)
+    ax.spines[["top", "right"]].set_visible(False)
+    plt.xticks(list(x), xlabels)
+    for bars in (b1, b2):
+        for bar in bars:
+            h = bar.get_height()
+            plt.text(bar.get_x() + bar.get_width() / 2, h + 0.01, f"{h:.0%}", ha="center", fontsize=9)
+    plt.ylabel("Test Accuracy")
+    plt.title("Phase 5: Pretrained (SBERT) vs From-Scratch (Doc2Vec) Embeddings", fontweight="bold", color=NAVY)
+    plt.legend(frameon=False)
+    plt.tight_layout()
+    plt.savefig("results/figures/sbert_vs_doc2vec.png", dpi=150)
+    print("Wrote results/figures/sbert_vs_doc2vec.png")
+except FileNotFoundError:
+    pass
+
+# ---------------- Progress across all 5 phases ----------------
+try:
+    with open("results/classifier_comparison.json") as f:
+        cc = json.load(f)
+    svm_doc2vec_area = next(
+        r for r in cc.values()
+        if r["classifier"] == "svm" and r["feature"] == "doc2vec" and r["label_task"] == "issue_area"
+    )
+    phase_labels = ["Phase 1\ndefault LR", "Phase 2\ntuned LR", "Phase 3\nSVM"]
+    phase_vals = [
+        table1["doc2vec_lr_issue_area"]["test"]["accuracy"],
+        tuned["doc2vec_lr_issue_area"]["test_after"]["accuracy"],
+        svm_doc2vec_area["test"]["accuracy"],
+    ]
+    colors_seq = [GREY, ACCENT, GREEN]
+    if phase4:
+        phase_labels.append("Phase 4\ntuned SVM")
+        phase_vals.append(phase4["test_after"]["accuracy"])
+        colors_seq.append(PURPLE)
+    try:
+        with open("results/sbert_results.json") as f:
+            sbert = json.load(f)
+        best_sbert = max(v["test"]["accuracy"] for k, v in sbert.items() if k.endswith("issue_area"))
+        phase_labels.append("Phase 5\nSBERT")
+        phase_vals.append(best_sbert)
+        colors_seq.append(RED)
+    except FileNotFoundError:
         pass
 
-# Phase 4 (tuned_classifiers.json) has no chart here -- the slide deck shows its
-# full 14-row before/after table directly instead of a cherry-picked top-5 chart.
+    fig, ax = plt.subplots(figsize=(9, 5.5))
+    ax.bar(phase_labels, phase_vals, color=colors_seq, width=0.55)
+    ax.plot(range(len(phase_vals)), phase_vals, color=NAVY, linewidth=2, marker="o", markersize=8, zorder=5)
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.set_ylim(0, max(phase_vals) * 1.25)
+    plt.ylabel("Test Accuracy")
+    plt.title("Best Model's Accuracy, Phase by Phase\n(issue_area)", fontweight="bold", color=NAVY)
+    for i, v in enumerate(phase_vals):
+        plt.text(i, v + 0.02, f"{v:.1%}", ha="center", fontweight="bold", fontsize=13, color=NAVY)
+    plt.tight_layout()
+    plt.savefig("results/figures/progress_by_phase.png", dpi=150)
+    print("Wrote results/figures/progress_by_phase.png")
+except (FileNotFoundError, StopIteration):
+    pass

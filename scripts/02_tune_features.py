@@ -6,17 +6,17 @@ Tunes:
   - Doc2Vec: vector_size (feature extractor), then LR C per label task
 
 Usage:
-    python run_all.py     # must run first (downloads/caches the corpus)
-    python tune_all.py
+    python scripts/01_replicate.py       # must run first (downloads/caches the corpus)
+    python scripts/02_tune_features.py
 """
 import json
 import sys
 import time
 
 sys.path.insert(0, "src")
-from pipeline import load_split_tokenize, evaluate_multiclass
-from lda_lr import LDAFeaturizer, train_lda_lr
-from doc2vec_lr import Doc2VecFeaturizer, train_doc2vec_lr
+from data.pipeline import load_split_tokenize, evaluate_multiclass
+from models.lda_lr import LDAFeaturizer, train_lda_lr
+from models.doc2vec_lr import Doc2VecFeaturizer, train_doc2vec_lr
 
 SEED = 42
 C_GRID = [0.01, 0.1, 1.0, 5.0, 10.0]

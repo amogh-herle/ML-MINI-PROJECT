@@ -6,3 +6,4 @@ pandas
 matplotlib
 reportlab
 python-pptx
+sentence-transformers
