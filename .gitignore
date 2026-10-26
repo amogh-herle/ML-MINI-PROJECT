@@ -19,8 +19,9 @@ env/
 .~lock*
 *.xlsx#
 
-# Project-specific: auto-downloaded dataset (~107MB, exceeds GitHub's 100MB limit)
-# and the local feature-matrix cache tune_classifiers.py builds (not reproducible,
-# not meant to be shared -- each machine rebuilds its own)
+# Project-specific: auto-downloaded dataset (~107MB, exceeds GitHub's 100MB limit),
+# the local feature-matrix cache tune_classifiers.py builds, and the saved
+# predict.py model (~13MB, rebuilt by train_best_model.py on any machine)
 data/
 results/feature_cache.pkl
+results/best_model/

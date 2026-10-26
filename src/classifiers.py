@@ -16,10 +16,13 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.naive_bayes import GaussianNB
 
 
-def build_svm(C=1.0, kernel="rbf"):
+def build_svm(C=1.0, kernel="rbf", probability=False):
     """Support Vector Machine. Maximizes the margin between classes; RBF
-    kernel lets it draw non-linear decision boundaries in feature space."""
-    return SVC(C=C, kernel=kernel)
+    kernel lets it draw non-linear decision boundaries in feature space.
+    probability=True enables predict_proba (an internal 5-fold CV calibration,
+    so it's slower to fit -- only turn it on when you actually need confidence
+    scores, e.g. for single-document inference)."""
+    return SVC(C=C, kernel=kernel, probability=probability)
 
 
 def build_random_forest(n_estimators=200, max_depth=None, seed=42):
